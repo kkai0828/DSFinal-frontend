@@ -7,6 +7,7 @@ import {
   Route,
   Routes,
   Link,
+  useLocation,
 } from 'react-router-dom'
 import Home from './components/Home'
 import Register from './components/Registration'
@@ -22,110 +23,186 @@ import PaymentPage from './components/PaymentPage'
 import ManageActivities from './components/manageActivities'
 import EditActivity from './components/editActivity'
 
+// Event categories for filters
+const EVENT_CATEGORIES = [
+  { id: 'all', name: '全部活動' },
+  { id: 'concert', name: '演唱會' },
+  { id: 'sports', name: '體育賽事' },
+  { id: 'theater', name: '戲劇表演' },
+  { id: 'exhibition', name: '展覽' },
+  { id: 'seminar', name: '講座' }
+];
+
+// Navigation links component with active state
+const NavigationLinks: React.FC = () => {
+  const location = useLocation();
+  const { isLoggedIn } = useAuth();
+  
+  // Check if the current route is active
+  const isActive = (path: string) => {
+    return location.pathname === path ? 'active' : '';
+  };
+  
+  return (
+    <>
+      <Link to="/" className={`nav-link ${isActive('/')}`}>
+        活動資訊
+      </Link>
+      {isLoggedIn && (
+        <Link to="/myTicket" className={`nav-link ${isActive('/myTicket')}`}>
+          我的訂單
+        </Link>
+      )}
+      <HostLink />
+    </>
+  );
+};
+
+// Search component for the header
+const SearchBar: React.FC = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const navigate = useNavigate();
+  
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    // In a real implementation, this would navigate to search results
+    console.log("Searching for:", searchTerm);
+    // navigate(`/search?q=${encodeURIComponent(searchTerm)}`);
+  };
+  
+  return (
+    <form className="search-container" onSubmit={handleSearch}>
+      <input
+        type="text"
+        className="search-input"
+        placeholder="搜尋活動..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+      />
+      <span className="search-icon">🔍</span>
+    </form>
+  );
+};
+
+// Category filters component for below the header
+const CategoryFilters: React.FC = () => {
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  
+  return (
+    <div className="category-filters bg-light py-3">
+      <div className="container">
+        <div className="filter-container">
+          {EVENT_CATEGORIES.map(category => (
+            <button
+              key={category.id}
+              className={`filter-button ${selectedCategory === category.id ? 'active' : ''}`}
+              onClick={() => setSelectedCategory(category.id)}
+            >
+              {category.name}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Footer component
+const Footer: React.FC = () => {
+  return (
+    <footer className="footer">
+      <div className="container">
+        <div className="footer-content">
+          <div className="footer-section">
+            <h3>關於我們</h3>
+            <p>tixkraft是一個專業票務平台，提供各種活動的售票服務。</p>
+          </div>
+          <div className="footer-section">
+            <h3>幫助中心</h3>
+            <ul className="footer-links">
+              <li><Link to="/faq">常見問題</Link></li>
+              <li><Link to="/contact">聯絡我們</Link></li>
+              <li><Link to="/privacy">隱私政策</Link></li>
+            </ul>
+          </div>
+          <div className="footer-section">
+            <h3>關注我們</h3>
+            <div className="social-links">
+              <a href="#" className="social-link">Facebook</a>
+              <a href="#" className="social-link">Instagram</a>
+              <a href="#" className="social-link">Twitter</a>
+            </div>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <p>&copy; {new Date().getFullYear()} tixkraft. All rights reserved.</p>
+        </div>
+      </div>
+    </footer>
+  );
+};
+
 const App: React.FC = () => {
-  const { isLoggedIn } = useAuth()
   return (
     <AuthProvider>
       <Router>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {/* Topbar */}
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'row',
-              height: '100px',
-              borderBottom: '1px solid #ccc',
-              padding: '0px 100px',
-              fontSize: '18px',
-              fontWeight: 'bold',
-              backgroundColor: '#0CCDDD',
-            }}
-          >
-            <nav
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'left',
-                width: '85%',
-                borderRight: '1px solid #ccc',
-              }}
-            >
-              <div>
-                <Link
-                  to="/"
-                  style={{
-                    textDecoration: 'none',
-                    color: '#333',
-                    fontSize: '50px',
-                    fontWeight: 'bold',
-                    marginRight: '30px',
-                  }}
-                >
-                  tixkraft
-                </Link>
+        <div className="app-container">
+          {/* Header with Navigation */}
+          <header className="navbar">
+            <div className="container">
+              <div className="d-flex justify-content-between align-items-center">
+                {/* Logo */}
+                <div className="navbar-brand">
+                  <Link to="/" className="logo-link">
+                    tixkraft
+                  </Link>
+                </div>
+                
+                {/* Navigation Links */}
+                <nav className="main-nav">
+                  <NavigationLinks />
+                </nav>
+                
+                {/* Search Bar */}
+                <div className="search-wrapper">
+                  <SearchBar />
+                </div>
+                
+                {/* User Account */}
+                <div className="user-nav">
+                  <LoginDisplay />
+                </div>
               </div>
-              <Link
-                style={{
-                  textDecoration: 'none',
-                  color: '#333',
-                  padding: '30px',
-                }}
-                to="/"
-                onMouseOver={(e) => (e.currentTarget.style.color = '#1E90FF')}
-                onMouseOut={(e) => (e.currentTarget.style.color = '#333')}
-              >
-                <p>活動資訊</p>
-              </Link>
-              {isLoggedIn && (
-                <Link
-                  style={{
-                    textDecoration: 'none',
-                    color: '#333',
-                    padding: '30px',
-                  }}
-                  to="/myTicket"
-                  onMouseOver={(e) => (e.currentTarget.style.color = '#1E90FF')}
-                  onMouseOut={(e) => (e.currentTarget.style.color = '#333')}
-                >
-                  <p>我的訂單</p>
-                </Link>
-              )}
-              <HostLink />
-            </nav>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-evenly',
-                width: '15%',
-              }}
-            >
-              <LoginDisplay /> {/* 顯示用戶名稱或登入按鈕 */}
             </div>
-          </div>
-          <div style={{ flex: 1, padding: '0px 100px' }}>
-            {/* 主要內容路由 */}
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/Activity/:id" element={<Activity />}></Route>
-              <Route
-                path="/editActivity/:id"
-                element={<EditActivity />}
-              ></Route>
-              <Route path="/create-activity" element={<CreateActivity />} />
-              <Route path="/manage-activity" element={<ManageActivities />} />
-              <Route path="/myTicket" element={<MyTicket />} />
-              <Route path="/settings" element={<UserSettings />} />
-              <Route
-                path="/settings/change-password"
-                element={<ChangePassword />}
-              />
-              <Route path="/buy-ticket/:id" element={<BuyTicketPage />} />
-              <Route path="/payment/:id" element={<PaymentPage />} />
-            </Routes>
-          </div>
+          </header>
+          
+          {/* Category Filters - only show on homepage */}
+          <Routes>
+            <Route path="/" element={<CategoryFilters />} />
+          </Routes>
+          
+          {/* Main Content */}
+          <main className="main-content">
+            <div className="container">
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/Activity/:id" element={<Activity />} />
+                <Route path="/editActivity/:id" element={<EditActivity />} />
+                <Route path="/create-activity" element={<CreateActivity />} />
+                <Route path="/manage-activity" element={<ManageActivities />} />
+                <Route path="/myTicket" element={<MyTicket />} />
+                <Route path="/settings" element={<UserSettings />} />
+                <Route path="/settings/change-password" element={<ChangePassword />} />
+                <Route path="/buy-ticket/:id" element={<BuyTicketPage />} />
+                <Route path="/payment/:id" element={<PaymentPage />} />
+              </Routes>
+            </div>
+          </main>
+          
+          {/* Footer */}
+          <Footer />
         </div>
       </Router>
     </AuthProvider>
@@ -134,219 +211,101 @@ const App: React.FC = () => {
 
 // 顯示用戶名稱或登入按鈕的組件
 const LoginDisplay: React.FC = () => {
-  const { isLoggedIn, name, logout } = useAuth()
-
-  const navigate = useNavigate()
+  const { isLoggedIn, name, logout } = useAuth();
+  const navigate = useNavigate();
+  const [showDropdown, setShowDropdown] = useState(false);
+  
   const handleLogout = () => {
-    logout()
-    navigate('/')
-    window.location.reload()
-  }
-  const [showDropdown, setShowDropdown] = useState(false)
-  let closeTimeout: NodeJS.Timeout | null = null
+    logout();
+    navigate('/');
+    window.location.reload();
+  };
+  
+  let closeTimeout: NodeJS.Timeout | null = null;
+  
   const handleMouseEnter = () => {
-    if (closeTimeout) clearTimeout(closeTimeout)
-    setShowDropdown(true)
-  }
+    if (closeTimeout) clearTimeout(closeTimeout);
+    setShowDropdown(true);
+  };
+  
   const handleMouseLeave = () => {
     closeTimeout = setTimeout(() => {
-      setShowDropdown(false)
-    }, 200)
-  }
+      setShowDropdown(false);
+    }, 200);
+  };
+  
   return (
     <>
       {isLoggedIn ? (
-        <>
-          <div
-            style={{
-              position: 'relative',
-              display: 'inline-block',
-            }}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
-          >
-            <button
-              style={{
-                backgroundColor: 'transparent',
-                border: '0px solid #ccc',
-                cursor: 'pointer',
-                padding: '10px',
-                color: '#000',
-                width: '200px', // 設定固定寬度與下拉選單一致
-                textAlign: 'center',
-                fontSize: '18px',
-                fontWeight: 'bold',
-              }}
-            >
-              會員帳戶
-            </button>{' '}
-            {showDropdown && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '50px',
-                  left: 0,
-                  backgroundColor: '#fff',
-                  border: '1px solid #ccc',
-                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                  zIndex: 10,
-                  minWidth: '200px',
-                }}
-                onMouseEnter={handleMouseEnter}
-              >
-                <ul
-                  style={{
-                    listStyle: 'none',
-                    padding: 0,
-                    margin: 0,
-                    justifyItems: 'center',
-                  }}
-                >
-                  <li
-                    style={{
-                      borderBottom: '1px solid #eee',
-                      padding: '10px 0',
-                      display: 'block', // 確保填滿父容器
-                      width: '100%',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <p>{name}</p>
-                  </li>
-                  <li
-                    style={{
-                      borderBottom: '1px solid #eee',
-                      padding: '10px 0',
-                      display: 'block', // 確保填滿父容器
-                      width: '100%',
-                    }}
-                  >
-                    <Link
-                      to="/settings"
-                      style={{
-                        textDecoration: 'none',
-                        textAlign: 'center',
-                        color: '#333',
-                        display: 'block', // 確保填滿父容器
-                        width: '100%',
-                      }}
-                      onMouseOver={(e) =>
-                        (e.currentTarget.style.color = '#1E90FF')
-                      }
-                      onMouseOut={(e) => (e.currentTarget.style.color = '#333')}
-                    >
-                      會員資料
-                    </Link>
-                  </li>
-                  <li
-                    style={{
-                      borderBottom: '1px solid #eee',
-                      padding: '10px 0',
-                      display: 'block', // 確保填滿父容器
-                      width: '100%',
-                    }}
-                  >
-                    <Link
-                      to="/myTicket"
-                      style={{
-                        textDecoration: 'none',
-                        textAlign: 'center',
-                        color: '#333',
-                        display: 'block', // 確保填滿父容器
-                        width: '100%',
-                      }}
-                      onMouseOver={(e) =>
-                        (e.currentTarget.style.color = '#1E90FF')
-                      }
-                      onMouseOut={(e) => (e.currentTarget.style.color = '#333')}
-                    >
-                      我的訂單
-                    </Link>
-                  </li>
-                  <li
-                    style={{
-                      borderBottom: '1px solid #eee',
-                      padding: '10px 0',
-                      display: 'block', // 確保填滿父容器
-                      width: '100%',
-                    }}
-                  >
-                    <button
-                      onClick={handleLogout}
-                      style={{
-                        backgroundColor: 'transparent',
-                        textDecoration: 'none',
-                        textAlign: 'center',
-                        color: '#333',
-                        display: 'block', // 確保填滿父容器
-                        fontSize: '16px',
-                        width: '100%',
-                        borderWidth: 0,
-                        cursor: 'pointer',
-                      }}
-                      onMouseOver={(e) =>
-                        (e.currentTarget.style.color = '#1E90FF')
-                      }
-                      onMouseOut={(e) => (e.currentTarget.style.color = '#333')}
-                    >
-                      登出
-                    </button>
-                  </li>
-                </ul>
-              </div>
-            )}
-          </div>
-        </>
+        <div 
+          className="user-dropdown"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          <button className="user-dropdown-toggle">
+            <span className="user-icon">👤</span>
+            <span>會員帳戶</span>
+          </button>
+          
+          {showDropdown && (
+            <div className="dropdown-menu" onMouseEnter={handleMouseEnter}>
+              <ul className="dropdown-list">
+                <li className="dropdown-item dropdown-user-info">
+                  <p>{name}</p>
+                </li>
+                <li className="dropdown-item">
+                  <Link to="/settings" className="dropdown-link">
+                    會員資料
+                  </Link>
+                </li>
+                <li className="dropdown-item">
+                  <Link to="/myTicket" className="dropdown-link">
+                    我的訂單
+                  </Link>
+                </li>
+                <li className="dropdown-item">
+                  <button onClick={handleLogout} className="dropdown-button">
+                    登出
+                  </button>
+                </li>
+              </ul>
+            </div>
+          )}
+        </div>
       ) : (
-        <>
-          <Link
-            to="/login"
-            style={{ textDecoration: 'none', color: '#333' }}
-            onMouseOver={(e) => (e.currentTarget.style.color = '#1E90FF')}
-            onMouseOut={(e) => (e.currentTarget.style.color = '#333')}
-          >
-            登入
-          </Link>
-          <Link
-            to="/register"
-            style={{
-              textDecoration: 'none',
-              color: '#333',
-              marginRight: '10px',
-            }}
-            onMouseOver={(e) => (e.currentTarget.style.color = '#1E90FF')}
-            onMouseOut={(e) => (e.currentTarget.style.color = '#333')}
-          >
-            註冊
-          </Link>
-        </>
+        <div className="auth-buttons">
+          <Link to="/login" className="auth-link">登入</Link>
+          <Link to="/register" className="auth-link auth-register">註冊</Link>
+        </div>
       )}
     </>
   )
 }
 const HostLink: React.FC = () => {
-  const { role } = useAuth()
+  const { role } = useAuth();
+  const location = useLocation();
+  
+  // Check if route is active
+  const isActive = (path: string) => {
+    return location.pathname === path ? 'active' : '';
+  };
+  
   return role === 'host' ? (
     <>
-      {' '}
-      <Link
-        to="/create-activity"
-        style={{ textDecoration: 'none', color: '#333', padding: '30px' }}
-        onMouseOver={(e) => (e.currentTarget.style.color = '#1E90FF')}
-        onMouseOut={(e) => (e.currentTarget.style.color = '#333')}
+      <Link 
+        to="/create-activity" 
+        className={`nav-link ${isActive('/create-activity')}`}
       >
         新增活動
       </Link>
-      <Link
-        to="/manage-activity"
-        style={{ textDecoration: 'none', color: '#333', padding: '30px' }}
-        onMouseOver={(e) => (e.currentTarget.style.color = '#1E90FF')}
-        onMouseOut={(e) => (e.currentTarget.style.color = '#333')}
+      <Link 
+        to="/manage-activity" 
+        className={`nav-link ${isActive('/manage-activity')}`}
       >
         管理活動
       </Link>
     </>
-  ) : null
+  ) : null;
 }
 
 export default App
