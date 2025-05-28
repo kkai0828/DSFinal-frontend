@@ -47,7 +47,7 @@ const Registration: React.FC = () => {
     e.preventDefault()
 
     try {
-      const response = await fetch(API_URL + '/auth/register', {
+      const response = await fetch(API_URL + '/auth/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -55,9 +55,9 @@ const Registration: React.FC = () => {
         body: JSON.stringify({
           email: accountData.email,
           password: accountData.password,
-          phone_number: personalData.phone,
-          role: 'user',
           username: personalData.name,
+          role: 'user',
+          phone_number: personalData.phone,
         }),
       })
 
