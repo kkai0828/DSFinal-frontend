@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-// const API_URL = 'http://localhost:8080'
-const API_URL = process.env.REACT_APP_API_URL
+import AuthService from '../services/auth-services'
+
+// API_URL 现在由 AuthService 内部处理，所以这里可以移除或注释掉
+// const API_URL = process.env.REACT_APP_API_URL
 
 const Registration: React.FC = () => {
   const [step, setStep] = useState(1)
@@ -12,7 +14,7 @@ const Registration: React.FC = () => {
   })
   const [personalData, setPersonalData] = useState({
     name: '',
-    gender: '',
+    // gender: '', // gender 字段似乎在后端注册 API 中未使用，暂时注释
     phone: '',
   })
   const [error, setError] = useState('')
@@ -45,36 +47,41 @@ const Registration: React.FC = () => {
 
   const handleSubmitPersonal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    setError('') // 清除之前的错误信息
+    setSuccess('') // 清除之前的成功信息
+
+    const registrationData = {
+      email: accountData.email,
+      password: accountData.password,
+      username: personalData.name,
+      role: 'user', // 根据 API 文档，role 是必须的
+      phone_number: personalData.phone,
+    }
 
     try {
-      const response = await fetch(API_URL + '/auth/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: accountData.email,
-          password: accountData.password,
-          username: personalData.name,
-          role: 'user',
-          phone_number: personalData.phone,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || '註冊失敗')
-      }
-
-      const data = await response.json()
-      setSuccess(data.message)
+      // 使用 AuthService.register
+      const response = await AuthService.register(registrationData)
+      
+      // axios 的响应数据在 response.data 中
+      // 后端成功注册返回 201 和用户信息，我们可以在这里设置成功消息
+      // 例如，假设后端返回的数据中有 username
+      setSuccess(`用户 ${response.data.username} 注册成功!`)
       setStep(3) // 轉到確認資訊步驟
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        setError(error.message)
+
+    } catch (err: any) {
+      // axios 的错误响应在 err.response 中
+      if (err.response && err.response.data) {
+        // 如果后端返回了具体的错误信息 (例如 text/plain)
+        if (typeof err.response.data === 'string') {
+          setError(err.response.data)
+        } else {
+          // 如果是其他结构，尝试提取 message，或者显示通用错误
+          setError(err.response.data.message || '註冊失敗，請稍後再試')
+        }
       } else {
-        setError('發生未知錯誤')
+        setError('註冊時發生未知錯誤')
       }
+      console.error('Registration failed:', err.response || err.message)
     }
   }
 
