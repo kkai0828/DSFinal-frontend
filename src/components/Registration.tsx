@@ -1,9 +1,8 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import AuthService from '../services/auth-services'
+// import AuthService from '../services/auth-services' // Removed import
 
-// API_URL 现在由 AuthService 内部处理，所以这里可以移除或注释掉
-// const API_URL = process.env.REACT_APP_API_URL
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost' // Added API_URL definition
 
 const Registration: React.FC = () => {
   const [step, setStep] = useState(1)
@@ -33,55 +32,62 @@ const Registration: React.FC = () => {
     const { name, value } = e.target
     setPersonalData({ ...personalData, [name]: value })
   }
+
   const handleSubmitAccount = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-
     if (accountData.password !== accountData.confirmPassword) {
       setError('密碼不一致')
       return
     }
-
     setError('')
-    setStep(2) // 轉到第二步
+    setStep(2)
   }
 
   const handleSubmitPersonal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setError('') // 清除之前的错误信息
-    setSuccess('') // 清除之前的成功信息
+    setError('')
+    setSuccess('')
 
     const registrationData = {
       email: accountData.email,
       password: accountData.password,
       username: personalData.name,
-      role: 'user', // 根据 API 文档，role 是必须的
+      role: 'user', // Default role
       phone_number: personalData.phone,
     }
 
     try {
-      // 使用 AuthService.register
-      const response = await AuthService.register(registrationData)
+      const response = await fetch(`${API_URL}/auth/`, { // Changed to /auth/ based on typical REST and previous findings
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(registrationData),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text() // Get error text from backend
+        // Attempt to parse as JSON if backend sends structured error, otherwise use text
+        try {
+          const errorJson = JSON.parse(errorText);
+          throw new Error(errorJson.detail || errorJson.message || errorText); // Use detail or message if available
+        } catch (parseError) {
+          throw new Error(errorText || '註冊失敗，請檢查您的資料');
+        }
+      }
+
+      const responseData = await response.json() // Assuming backend returns JSON on success
       
-      // axios 的响应数据在 response.data 中
-      // 后端成功注册返回 201 和用户信息，我们可以在这里设置成功消息
-      // 例如，假设后端返回的数据中有 username
-      setSuccess(`用户 ${response.data.username} 注册成功!`)
-      setStep(3) // 轉到確認資訊步驟
+      setSuccess(`用户 ${responseData.username || registrationData.username} 注册成功!`)
+      setStep(3)
 
     } catch (err: any) {
-      // axios 的错误响应在 err.response 中
-      if (err.response && err.response.data) {
-        // 如果后端返回了具体的错误信息 (例如 text/plain)
-        if (typeof err.response.data === 'string') {
-          setError(err.response.data)
-        } else {
-          // 如果是其他结构，尝试提取 message，或者显示通用错误
-          setError(err.response.data.message || '註冊失敗，請稍後再試')
-        }
+      if (err instanceof Error) {
+        setError(err.message || '註冊時發生未知錯誤');
       } else {
-        setError('註冊時發生未知錯誤')
+        setError('註冊時發生未知錯誤');
       }
-      console.error('Registration failed:', err.response || err.message)
+      console.error('Registration failed:', err);
     }
   }
 

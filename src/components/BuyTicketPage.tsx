@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getArena } from '../context/kits'
 
-const API_URL = process.env.REACT_APP_API_URL
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost'
 
 interface Arena {
   _id: string
@@ -43,9 +43,9 @@ const BuyTicketPage: React.FC = () => {
   const navigate = useNavigate()
 
   // 獲取活動資料
-  const fetchActivity = async (id: string) => {
+  const fetchActivity = useCallback(async (activityId: string) => {
     try {
-      const response = await fetch(`${API_URL}/activities/${id}`, {
+      const response = await fetch(`${API_URL}/activities/${activityId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -53,52 +53,59 @@ const BuyTicketPage: React.FC = () => {
       })
       if (response.ok) {
         const data = await response.json()
-        setActivity(data.activity) // 保存活動資料
+        setActivity(data.activity)
         getArena(setArena, data.activity.arena_id)
-        // 可能還需要調用 API 獲取 arena 資訊
       } else {
         console.error('Failed to fetch activity:', response.statusText)
       }
     } catch (error) {
       console.error('Error fetching activity:', error)
     }
-  }
-  const fetchTicketByRegion = async (regionId: string, isPaid: boolean) => {
+  }, [])
+
+  const fetchTicketByRegion = useCallback(async (regionId: string, isPaid: boolean) => {
     try {
       const url = new URL(`${API_URL}/tickets/list-by-region`)
       url.searchParams.append('region_id', regionId)
       url.searchParams.append('is_paid', isPaid.toString())
 
       const headers = new Headers()
-      headers.append('Authorization', `${jwtToken}`)
+      if (jwtToken) {
+        headers.append('Authorization', `${jwtToken}`)
+      } else {
+        console.error('JWT token is not available for fetching tickets by region.');
+        return;
+      }
 
       const requestOptions = {
         method: 'GET',
         headers: headers,
       }
-      const response = await fetch('http://35.78.245.230:8080/tickets/list-by-region?region_id=4056a455-14bb-4171-a5fb-8b70d9ec3223&is_paid=false', requestOptions)
+      const response = await fetch(url.toString(), requestOptions)
       console.log(response)
 
       if (response.ok) {
         const data = await response.json()
-        setLeftCapacity(data.tickets.length) // 确保这里有正确定义的 state 设置函数
+        setLeftCapacity(data.tickets.length)
       } else {
         console.error('Failed to fetch tickets:', response.statusText)
       }
     } catch (error) {
       console.error('Error fetching ticket:', error)
     }
-  }
+  }, [jwtToken])
+
   useEffect(() => {
     if (id) {
       fetchActivity(id) // 根據 ID 獲取活動資料
     }
-  }, [id])
+  }, [id, fetchActivity])
+
   useEffect(() => {
     if (selectedRegion) {
       fetchTicketByRegion(selectedRegion, false) // 獲取選擇區域的剩餘座位數
     }
-  }, [selectedRegion])
+  }, [selectedRegion, fetchTicketByRegion])
   // 計算總金額
   const calculateTotal = () => {
     if (activity && selectedRegion) {

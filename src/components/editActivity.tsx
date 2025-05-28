@@ -1,9 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { listArena } from '../context/kits'
 import { useNavigate, useParams } from 'react-router-dom'
-import { convertToObject } from 'typescript'
-const API_URL = process.env.REACT_APP_API_URL
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost'
 
 interface Arena {
   _id: string
@@ -29,7 +28,6 @@ const EditActivity = () => {
   const [onSaleDate, setOnSaleDate] = useState('')
   const [arenaId, setArenaId] = useState('')
   const [regions, setRegions] = useState<Region[]>([])
-  const [originRegions, setOriginRegions] = useState<Region[]>([])
   const [coverImg, setCoverImg] = useState<File | null>(null)
   const [priceLevelImg, setPriceLevelImg] = useState<File | null>(null)
 
@@ -38,16 +36,16 @@ const EditActivity = () => {
   const navigate = useNavigate()
   const [isOnSale, setIsOnSale] = useState(false)
 
-  const checkIsOnSale = () => {
-    if (isOnSale) return
+  const checkIsOnSale = useCallback(() => {
     const today = new Date()
     const saleDate = new Date(onSaleDate)
     const disabled = saleDate > today
     setIsOnSale(disabled)
-  }
-  const fetchActivity = async (id: string) => {
+  }, [onSaleDate])
+
+  const fetchActivity = useCallback(async (activityId: string) => {
     try {
-      const response = await fetch(`${API_URL}/activities/${id}`, {
+      const response = await fetch(`${API_URL}/activities/${activityId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -55,9 +53,8 @@ const EditActivity = () => {
       })
       if (response.ok) {
         const data = await response.json()
-        const activityData = data.activity // 確保資料格式正確
+        const activityData = data.activity
 
-        // 設定表單預設值
         setTitle(activityData.title || '')
         setContent(activityData.content || '')
         setActivityDate(
@@ -83,21 +80,16 @@ const EditActivity = () => {
             }))
           )
         }
-        setOriginRegions(activityData.regions)
-        setCoverImg(activityData.cover_img as File)
-        setPriceLevelImg(activityData.price_level_img as File)
-        // console.log(activityData)
         const formatToInputDateTime = (isoDateTime: string | undefined) => {
-          if (!isoDateTime) return '' // 若未定義值，返回空字串
-          const date = new Date(isoDateTime) // 確保是日期對象
+          if (!isoDateTime) return ''
+          const date = new Date(isoDateTime)
           const year = date.getFullYear()
-          const month = String(date.getMonth() + 1).padStart(2, '0') // 月份補 0
+          const month = String(date.getMonth() + 1).padStart(2, '0')
           const day = String(date.getDate()).padStart(2, '0')
-          const hours = String(date.getHours()).padStart(2, '0') // 小時補 0
-          const minutes = String(date.getMinutes()).padStart(2, '0') // 分鐘補 0
+          const hours = String(date.getHours()).padStart(2, '0')
+          const minutes = String(date.getMinutes()).padStart(2, '0')
           return `${year}-${month}-${day}T${hours}:${minutes}`
         }
-        setOnSaleDate(activityData.on_sale_date || '')
         setOnSaleDate(formatToInputDateTime(activityData?.on_sale_date))
       } else {
         console.error('Failed to fetch activity:', response.statusText)
@@ -105,15 +97,20 @@ const EditActivity = () => {
     } catch (error) {
       console.error('Error fetching activity:', error)
     }
-  }
-
-  React.useEffect(() => {
-    listArena(setArenas)
-    fetchActivity(id!)
   }, [])
-  React.useEffect(() => {
+
+  useEffect(() => {
+    if (id) {
+      listArena(setArenas)
+      fetchActivity(id)
+    } else {
+      console.error("Activity ID is not available.")
+    }
+  }, [id, fetchActivity])
+
+  useEffect(() => {
     checkIsOnSale()
-  }, [onSaleDate])
+  }, [onSaleDate, checkIsOnSale])
 
   // 合併選擇的日期和時間
   const combineDateTime = (date: string, time: string): string => {
@@ -327,7 +324,7 @@ const EditActivity = () => {
         <h3>區域</h3>
         <p className="sub-description">區域名稱、價格、座位上限</p>
         {regions.map((region, index) => {
-          const isNewRegion = !originRegions.some(
+          const isNewRegion = !regions.some(
             (origRegion) =>
               origRegion.region_name === region.region_name &&
               origRegion.region_price === region.region_price &&

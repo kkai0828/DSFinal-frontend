@@ -1,9 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import Widget from './widget'
 import { useAuth } from '../context/AuthContext'
-import { listArena } from '../context/kits'
-import { useNavigate } from 'react-router-dom'
-const API_URL = process.env.REACT_APP_API_URL
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost'
 
 interface Region {
   region_name: string
@@ -27,12 +25,12 @@ interface Activity {
 }
 
 const ManageActivities = () => {
-  const { jwtToken, role } = useAuth()
-  const [activities, setActivities] = React.useState<Activity[]>([])
-  const [arenaId, setArenaId] = React.useState('')
-  const fetchActivities = async (arenaId: any) => {
+  const { role } = useAuth()
+  const [activities, setActivities] = useState<Activity[]>([])
+
+  const fetchActivities = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/activities/list`, {
+      const response = await fetch(`${API_URL}/activities`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -41,20 +39,20 @@ const ManageActivities = () => {
 
       if (response.ok) {
         const data = await response.json()
-        setActivities(data.activities) // 使用后端返回的 activities 数据
+        setActivities(data.activities)
       } else {
         console.error('Failed to fetch activities:', response.statusText)
       }
     } catch (error) {
       console.error('Error fetching activities:', error)
     }
-  }
-
-  React.useEffect(() => {
-    fetchActivities(arenaId) // 页面加载时获取活动数据
   }, [])
 
-  if (role != 'host') {
+  useEffect(() => {
+    fetchActivities()
+  }, [fetchActivities])
+
+  if (role !== 'host') {
     return <h2>Permissions denied</h2>
   }
   return (
@@ -69,7 +67,7 @@ const ManageActivities = () => {
           flexWrap: 'wrap',
         }}
       >
-        {activities.length == 0 && <p>尚無活動</p>}
+        {activities.length === 0 && <p>尚無活動</p>}
         {activities.map((activity) => (
           <Widget
             key={activity._id}

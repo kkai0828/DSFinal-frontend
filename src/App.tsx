@@ -61,11 +61,9 @@ const NavigationLinks: React.FC = () => {
 // Search component for the header
 const SearchBar: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const navigate = useNavigate();
   
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real implementation, this would navigate to search results
     console.log("Searching for:", searchTerm);
     // navigate(`/search?q=${encodeURIComponent(searchTerm)}`);
   };
@@ -128,9 +126,9 @@ const Footer: React.FC = () => {
           <div className="footer-section">
             <h3>關注我們</h3>
             <div className="social-links">
-              <a href="#" className="social-link">Facebook</a>
-              <a href="#" className="social-link">Instagram</a>
-              <a href="#" className="social-link">Twitter</a>
+              <a href="/#" className="social-link">Facebook</a>
+              <a href="/#" className="social-link">Instagram</a>
+              <a href="/#" className="social-link">Twitter</a>
             </div>
           </div>
         </div>

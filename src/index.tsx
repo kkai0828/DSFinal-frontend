@@ -1,31 +1,22 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
 import App from './App'
 import reportWebVitals from './reportWebVitals'
-import { AuthProvider } from './context/AuthContext' // 假设你已经创建了 AuthContext
+import { AuthProvider } from './context/AuthContext'
 
-// checkLoginStatus 用于从 localStorage 获取并设置登录状态
+// checkLoginStatus function is no longer needed as AuthProvider handles this
+/*
 const checkLoginStatus = () => {
   const jwtToken = localStorage.getItem('jwt_token')
   const name = localStorage.getItem('name')
-
   return { jwtToken, name }
 }
+*/
 
 const Root = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [name, setName] = useState<string | null>(null)
-
-  useEffect(() => {
-    const { jwtToken, name } = checkLoginStatus()
-    if (jwtToken) {
-      setIsLoggedIn(true)
-      setName(name)
-    } else {
-      setIsLoggedIn(false)
-    }
-  }, [])
+  // Removed useState for isLoggedIn and name, and the useEffect
+  // AuthProvider will handle the auth state internally by reading from localStorage
 
   return (
     <AuthProvider>
@@ -33,6 +24,7 @@ const Root = () => {
     </AuthProvider>
   )
 }
+
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement)
 root.render(
   <React.StrictMode>

@@ -1,4 +1,3 @@
-import { useAuth } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
 import { formatDate } from '../context/kits'
 import './Widget.css'
@@ -35,7 +34,7 @@ function Widget({
   category,
   featured = false,
 }: WidgetProps) {
-  const { isLoggedIn } = useAuth()
+  // const { isLoggedIn } = useAuth() // isLoggedIn was unused
 
   // Format the date for display
   const dateDisplay = formatDate(start_date) === formatDate(end_date)

@@ -1,12 +1,12 @@
 // components/Login.tsx
 import React, { useState } from 'react'
-import axios from 'axios'
-import { useNavigate } from 'react-router-dom' // 導入 useNavigate
-import { useAuth } from '../context/AuthContext' // 確保導入 useAuth
-const API_URL = process.env.REACT_APP_API_URL
+// import axios from 'axios' // No longer needed as we are consistently using fetch
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost' // Fallback for local dev, assuming port 80
 
 const Login: React.FC = () => {
-  const [email, setemail] = useState('')
+  const [email, setEmail] = useState('') // Renamed for consistency
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const { login } = useAuth()
@@ -17,7 +17,8 @@ const Login: React.FC = () => {
     setError('')
 
     try {
-      const response = await fetch(API_URL + '/auth/login', {
+      // Step 1: Login to get the access token
+      const loginResponse = await fetch(API_URL + '/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -27,30 +28,62 @@ const Login: React.FC = () => {
           password,
         }),
       })
-      if (!response.ok) {
-        const errorText = await response.text() // 获取服务器返回的错误信息
-        throw new Error(errorText)
+
+      if (!loginResponse.ok) {
+        const errorText = await loginResponse.text()
+        // Try to parse as JSON if backend sends structured error, otherwise use text
+        try {
+          const errorJson = JSON.parse(errorText);
+          throw new Error(errorJson.detail || errorJson.message || errorText);
+        } catch (parseError) {
+          throw new Error(errorText || '登录失败，请检查您的凭据');
+        }
       }
 
-      const data = await response.json()
-      if (data.jwtToken) {
-        // 登录成功后，调用 login 保存状态和 token
+      const loginData = await loginResponse.json()
+
+      if (loginData.access_token) {
+        const token = loginData.access_token
+
+        // Step 2: Get user info using the token
+        const userInfoResponse = await fetch(API_URL + '/auth/get_user_info', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+
+        if (!userInfoResponse.ok) {
+          const errorText = await userInfoResponse.text()
+          try {
+            const errorJson = JSON.parse(errorText);
+            throw new Error(errorJson.detail || errorJson.message || errorText || '获取用户信息失败');
+          } catch (parseError) {
+             throw new Error(errorText || '获取用户信息失败');
+          }
+        }
+
+        const userInfo = await userInfoResponse.json()
+
+        // Call login from AuthContext with all user details and token
         login(
-          data.email,
-          data.username,
-          data.jwtToken,
-          data.role,
-          data.phone_number
+          token, // Pass the token itself
+          userInfo.email,
+          userInfo.username,
+          userInfo.role,
+          userInfo.phone_number,
+          userInfo.id // Assuming AuthContext's login can also store user ID
         )
-        navigate('/') // 跳转到首页
+        navigate('/') // Navigate to homepage
       } else {
-        alert('登录失败')
+        setError('登录失败，未收到访问令牌')
       }
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        setError(error.response.data.message || '登入失敗')
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message || '发生未知错误')
       } else {
-        setError('伺服器錯誤，請稍後再試')
+        setError('发生未知错误')
       }
     }
   }
@@ -60,12 +93,12 @@ const Login: React.FC = () => {
       <h2>登入</h2>
       <form onSubmit={handleSubmit}>
         <div>
-          <label htmlFor="email">帳號:</label>
+          <label htmlFor="email">帳號 (Email):</label> {/* Clarified label */}
           <input
-            type="text"
+            type="email" // Changed to type="email" for better validation
             id="email"
             value={email}
-            onChange={(e) => setemail(e.target.value)}
+            onChange={(e) => setEmail(e.target.value)} // Corrected setter
             required
             className="input-region"
           />

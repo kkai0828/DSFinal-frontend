@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
 
-const API_URL = process.env.REACT_APP_API_URL
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost'
 
 interface Ticket {
   _id: number
@@ -34,7 +34,7 @@ const MyTicket: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
   const [activities, setActivities] = useState<Record<string, Activity>>({})
 
-  const fetchActivity = async (id: string) => {
+  const fetchActivity = useCallback(async (id: string) => {
     try {
       const response = await fetch(`${API_URL}/activities/${id}`, {
         method: 'GET',
@@ -50,16 +50,22 @@ const MyTicket: React.FC = () => {
           [id]: data.activity,
         }))
       } else {
-        console.error('Failed to fetch activity:', response.statusText)
+        console.error('Failed to fetch activity details for ID:', id, response.statusText)
       }
     } catch (error) {
-      console.error('Error fetching activity:', error)
+      console.error('Error fetching activity details for ID:', id, error)
     }
-  }
+  }, [])
 
-  const fetchTickets = async () => {
+  const fetchTickets = useCallback(async () => {
     setLoading(true)
     setError(null)
+
+    if (!jwtToken) {
+        setError('用户未认证，无法获取票务信息。');
+        setLoading(false);
+        return;
+    }
 
     try {
       const response = await fetch(`${API_URL}/tickets/list`, {
@@ -74,22 +80,30 @@ const MyTicket: React.FC = () => {
         const data = await response.json()
         setTickets(data.tickets)
 
+        const activityIdsToFetch = new Set<string>();
         data.tickets.forEach((ticket: Ticket) => {
           if (!activities[ticket.activity_id]) {
-            fetchActivity(ticket.activity_id)
+            activityIdsToFetch.add(ticket.activity_id);
           }
-        })
+        });
+        activityIdsToFetch.forEach(activityId => fetchActivity(activityId));
+
       } else {
         const errorText = await response.text()
-        throw new Error(errorText)
+        if (errorText.includes('No tickets found')) {
+            setTickets([]);
+            setError(null);
+        } else {
+            throw new Error(errorText)
+        }
       }
     } catch (error: any) {
-      console.error(error)
+      console.error('Error fetching tickets:', error)
       setError(error.message || '發生未知錯誤')
     } finally {
       setLoading(false)
     }
-  }
+  }, [jwtToken, fetchActivity, activities])
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -97,8 +111,9 @@ const MyTicket: React.FC = () => {
     } else {
       setError('請先登入以檢視您的訂單。')
       setLoading(false)
+      setTickets([])
     }
-  }, [isLoggedIn])
+  }, [isLoggedIn, fetchTickets])
 
   const filteredTickets = tickets.filter((ticket) => {
     if (filter === 'paid') return ticket.is_paid
@@ -110,15 +125,14 @@ const MyTicket: React.FC = () => {
     return <div>正在加載票務信息...</div>
   }
 
-  if (error && error != `{"error":"No tickets found for this user"}`) {
-    return <div>{error}</div>
+  if (error) {
+    return <div>錯誤: {error}</div>
   }
 
   return (
     <div>
       <h2>我的訂單</h2>
 
-      {/* 篩選按鈕 */}
       <div style={{ marginBottom: '20px' }}>
         <button
           onClick={() => setFilter('all')}
@@ -161,7 +175,6 @@ const MyTicket: React.FC = () => {
         </button>
       </div>
 
-      {/* 表格顯示票務列表 */}
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr>
@@ -194,7 +207,7 @@ const MyTicket: React.FC = () => {
               座位
             </th>
             <th
-              colSpan={2} // 合并为两列
+              colSpan={2}
               style={{
                 border: '1px solid #ccc',
                 padding: '8px',
@@ -209,7 +222,7 @@ const MyTicket: React.FC = () => {
           {filteredTickets.length === 0 ? (
             <tr>
               <td
-                colSpan={5} // 扩展为五列（包括新增的“支付”列）
+                colSpan={5}
                 style={{
                   border: '1px solid #ccc',
                   padding: '8px',
@@ -253,7 +266,7 @@ const MyTicket: React.FC = () => {
                     {ticket.seat_number}
                   </td>
                   <td
-                    colSpan={ticket.is_paid ? 2 : 1} // 合并为两列
+                    colSpan={ticket.is_paid ? 2 : 1}
                     style={{
                       border: '1px solid #ccc',
                       padding: '8px',
@@ -277,9 +290,8 @@ const MyTicket: React.FC = () => {
                         textAlign: 'center',
                       }}
                     >
-                      {/* 如果未付款，顯示付款連結 */}
                       <Link
-                        to={`/payment/${ticket._id}`} // 假設支付頁面的連結結構
+                        to={`/payment/${ticket._id}`}
                         style={{
                           color: '#007bff',
                           textDecoration: 'none',

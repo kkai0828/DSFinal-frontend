@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useParams, useNavigate } from 'react-router-dom'
 
-const API_URL = process.env.REACT_APP_API_URL
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost'
 
 interface Ticket {
   _id: string
@@ -11,27 +11,28 @@ interface Ticket {
   seat_number: number
   is_paid: boolean
 }
+/* Region interface seems unused after removing region state
 interface Region {
   region_name: string
   region_price: number
   region_capacity: number
 }
+*/
 const PaymentPage: React.FC = () => {
   const { id } = useParams()
   const { jwtToken, name, phone } = useAuth()
-  const [ticket, setTicket] = useState<Ticket>() // 儲存票據詳情
+  const [ticket, setTicket] = useState<Ticket>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [region, setRegion] = useState<Region>()
 
-  const [cardNumber, setCardNumber] = useState(['1234', '5678', '9012', '3456']) // 四個輸入框
+  const [cardNumber, setCardNumber] = useState(['1234', '5678', '9012', '3456'])
   const [cvv, setCvv] = useState('123')
   const [expiryMonth, setExpiryMonth] = useState('01')
   const [expiryYear, setExpiryYear] = useState('27')
 
   const navigate = useNavigate()
 
-  const fetchRegions = async (ticket_id: string) => {
+  const fetchRegions = useCallback(async (ticket_id: string) => {
     try {
       const response = await fetch(
         `${API_URL}/activities/regions/${ticket_id}`,
@@ -41,39 +42,53 @@ const PaymentPage: React.FC = () => {
         }
       )
       if (response.ok) {
-        const data = await response.json() // 使用 API 獲取票據信息
-        setRegion(data.region)
+        await response.json()
+      } else {
+        console.error('Failed to fetch regions:', response.statusText);
       }
     } catch (error) {
-      throw new Error()
+      console.error('Error fetching regions:', error);
     }
-  }
-  const fetchTicketDetails = async (id: string) => {
+  }, [])
+
+  const fetchTicketDetails = useCallback(async (ticketId: string) => {
     try {
       setLoading(true)
-      const response = await fetch(`${API_URL}/tickets/get/${id}`, {
+      setError(null);
+      const requestHeaders: HeadersInit = {};
+      if (jwtToken) {
+        requestHeaders['authorization'] = `${jwtToken}`;
+      }
+
+      const response = await fetch(`${API_URL}/tickets/get/${ticketId}`, {
         method: 'GET',
-        headers: { authorization: `${jwtToken}` },
+        headers: requestHeaders,
         redirect: 'follow',
       })
       if (response.ok) {
-        const data = await response.json() // 使用 API 獲取票據信息
+        const data = await response.json()
         setTicket(data.ticket)
-        fetchRegions(data.ticket.region_id)
-        setLoading(false)
+        if (data.ticket && data.ticket.region_id) {
+          fetchRegions(data.ticket.region_id)
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('Failed to fetch ticket details:', response.statusText, errorText);
+        setError(`無法獲取票據詳情: ${response.statusText}`);
       }
     } catch (error: any) {
+      console.error('Error in fetchTicketDetails:', error);
       setError('無法獲取票據詳情')
     } finally {
       setLoading(false)
     }
-  }
+  }, [jwtToken, fetchRegions])
 
   useEffect(() => {
     if (id) {
       fetchTicketDetails(id)
     }
-  }, [id])
+  }, [id, fetchTicketDetails])
 
   const handleCardInput = (index: number, value: string) => {
     if (/^\d{0,4}$/.test(value)) {
@@ -97,7 +112,7 @@ const PaymentPage: React.FC = () => {
       console.log('開始付款處理...')
 
       const myHeaders = new Headers()
-      myHeaders.append('Authorization', `${jwtToken}`) // 使用 Context 中的 jwtToken
+      myHeaders.append('Authorization', `${jwtToken}`)
       myHeaders.append('Content-Type', 'application/x-www-form-urlencoded')
 
       const urlencoded = new URLSearchParams()
@@ -145,10 +160,6 @@ const PaymentPage: React.FC = () => {
           <strong>訂單編號: </strong>
           {ticket._id}
         </p>
-        {/* <p> */}
-        {/*   <strong>訂單金額: </strong> */}
-        {/*   {region?.region_price} */}
-        {/* </p> */}
         <p>
           <strong>座位: </strong>
           {ticket.seat_number}
@@ -162,7 +173,6 @@ const PaymentPage: React.FC = () => {
           {phone}
         </p>
 
-        {/* 新增信用卡輸入 */}
         <div style={{ marginTop: '20px' }}>
           <label>
             信用卡卡號
@@ -240,23 +250,6 @@ const PaymentPage: React.FC = () => {
           立即付款
         </button>
       </div>
-
-      {/* <div style={{ marginTop: '10px' }}> */}
-      {/*   <button */}
-      {/*     onClick={() => navigate(-1)} */}
-      {/*     style={{ */}
-      {/*       padding: '10px 20px', */}
-      {/*       backgroundColor: '#007bff', */}
-      {/*       color: 'white', */}
-      {/*       border: 'none', */}
-      {/*       borderRadius: '5px', */}
-      {/*       cursor: 'pointer', */}
-      {/*       marginTop: '10px', */}
-      {/*     }} */}
-      {/*   > */}
-      {/*     返回 */}
-      {/*   </button> */}
-      {/* </div> */}
     </div>
   )
 }

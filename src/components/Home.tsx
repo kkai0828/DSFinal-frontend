@@ -1,9 +1,9 @@
 // src/components/Home.tsx
 import React, { useState, useEffect, useMemo } from 'react'
 import Widget from './widget'
-import { useAuth } from '../context/AuthContext'
+// import { useAuth } from '../context/AuthContext' // isLoggedIn was unused
 
-const API_URL = process.env.REACT_APP_API_URL
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost' // Fallback for local dev, assuming port 80
 
 // Interface definitions
 interface Region {
@@ -39,7 +39,7 @@ const EVENT_CATEGORIES = [
   { id: 'seminar', name: '講座' }
 ];
 const Home: React.FC = () => {
-  const { isLoggedIn } = useAuth()
+  // const { isLoggedIn } = useAuth() // isLoggedIn was unused
   const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -50,7 +50,7 @@ const Home: React.FC = () => {
     const fetchActivities = async () => {
       try {
         setLoading(true)
-        const response = await fetch(`${API_URL}/activities/list`, {
+        const response = await fetch(`${API_URL}/activities`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',

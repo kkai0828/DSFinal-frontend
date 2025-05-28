@@ -72,7 +72,9 @@ const CreateActivity = () => {
       !endTime ||
       !onSaleDate ||
       !arenaId ||
-      regions.length == 0
+      regions.length === 0 ||
+      !coverImg ||
+      !priceLevelImg
     ) {
       alert('資料不得為空')
       return
@@ -157,7 +159,7 @@ const CreateActivity = () => {
     setRegions(updatedRegions)
   }
 
-  if (role != 'host') {
+  if (role !== 'host') {
     return <h2>Permissions denied</h2>
   }
 

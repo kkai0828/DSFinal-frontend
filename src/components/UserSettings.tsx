@@ -49,9 +49,19 @@ const UserSettings: React.FC = () => {
       // 保存更新後的用戶資訊到本地存儲
       localStorage.setItem('name', updatedUser.username)
       localStorage.setItem('phone', updatedUser.phone_number)
+      // Note: The PUT /auth endpoint might not return the full user object with id.
+      // We should rely on the userId already in localStorage from the initial login.
+      const userId = localStorage.getItem('userId');
+      if (!userId) {
+        // This case should ideally not happen if user is logged in and userId was stored
+        alert('發生錯誤：無法找到使用者ID，請重新登入。');
+        // Optionally, redirect to login or handle more gracefully
+        return;
+      }
 
       // 更新 AuthContext 的用戶資訊
-      login(email, updatedUser.username, token, role, updatedUser.phone_number)
+      // The order of arguments for login is: token, email, name, role, phone, userId
+      login(token, email, updatedUser.username, role as 'user' | 'host' | 'admin', updatedUser.phone_number, userId)
 
       alert('資訊更新成功')
     } catch (error: any) {
