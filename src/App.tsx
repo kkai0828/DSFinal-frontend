@@ -25,12 +25,7 @@ import EditActivity from './components/editActivity'
 
 // Event categories for filters
 const EVENT_CATEGORIES = [
-  { id: 'all', name: '全部活動' },
-  { id: 'concert', name: '演唱會' },
-  { id: 'sports', name: '體育賽事' },
-  { id: 'theater', name: '戲劇表演' },
-  { id: 'exhibition', name: '展覽' },
-  { id: 'seminar', name: '講座' }
+  { id: 'all', name: '全部活動' }
 ];
 
 // Navigation links component with active state
@@ -84,21 +79,15 @@ const SearchBar: React.FC = () => {
 
 // Category filters component for below the header
 const CategoryFilters: React.FC = () => {
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  
   return (
     <div className="category-filters bg-light py-3">
       <div className="container">
         <div className="filter-container">
-          {EVENT_CATEGORIES.map(category => (
-            <button
-              key={category.id}
-              className={`filter-button ${selectedCategory === category.id ? 'active' : ''}`}
-              onClick={() => setSelectedCategory(category.id)}
-            >
-              {category.name}
-            </button>
-          ))}
+          <button
+            className="filter-button active"
+          >
+            全部活動
+          </button>
         </div>
       </div>
     </div>
