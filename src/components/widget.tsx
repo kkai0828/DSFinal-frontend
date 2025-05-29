@@ -14,7 +14,7 @@ const CATEGORY_MAP: {[key: string]: {name: string, color: string}} = {
 interface WidgetProps {
   id: string
   path: string
-  imageUrl: { type: string; data: number[] }
+  imageUrl: string
   name: string
   on_sale_date: string
   start_date: string

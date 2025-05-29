@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom'
 // API requests will use the proxy defined in package.json
 
 const Registration: React.FC = () => {
-  const [step, setStep] = useState(1)
   const [accountData, setAccountData] = useState({
     email: '',
     password: '',

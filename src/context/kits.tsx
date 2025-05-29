@@ -26,19 +26,20 @@ export async function listArena(
   setArenas: React.Dispatch<React.SetStateAction<any[]>>
 ) {
   try {
-    const response = await fetch(`${API_URL}/arenas/list`, {
+    const response = await fetch('/arenas/', {
       method: 'GET',
       redirect: 'follow',
     })
 
     if (response.ok) {
       const data = await response.json()
-      setArenas(data.arenas)
+      setArenas(data)
     } else {
       console.error('Failed to fetch arenas:', response.statusText)
     }
   } catch (error) {
     console.error('Error fetching arenas:', error)
+    return []
   }
 }
 
@@ -47,7 +48,7 @@ export async function getArena(
   arenaId: string
 ) {
   try {
-    const response = await fetch(`${API_URL}/arenas/arena/${arenaId}`, {
+    const response = await fetch(`arenas/${arenaId}`, {
       method: 'GET',
       redirect: 'follow',
     })

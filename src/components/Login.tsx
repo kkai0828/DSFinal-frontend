@@ -3,7 +3,6 @@ import React, { useState } from 'react'
 // import axios from 'axios' // No longer needed as we are consistently using fetch
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost' // Fallback for local dev, assuming port 80
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('') // Renamed for consistency

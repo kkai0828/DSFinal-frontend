@@ -1,76 +1,56 @@
 // src/components/Home.tsx
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect} from 'react'
 import Widget from './widget'
-// import { useAuth } from '../context/AuthContext' // isLoggedIn was unused
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost' // Fallback for local dev, assuming port 80
-
-// Interface definitions
-interface Region {
-  region_name: string
-  region_price: number
-  region_capacity: number
-}
 
 interface Activity {
-  _id: string
+  id: string
   on_sale_date: string
   start_time: string
   end_time: string
   title: string
   content: string
-  cover_img: { type: string; data: number[] }
-  price_level_img: { type: string; data: number[] }
+  price: number
+  cover_image: string
   arena_id: string
   creator_id: string
-  is_archived: boolean
-  regions: Region[]
-  category?: string // Optional category field
-  featured?: boolean // Optional featured flag
+  is_achieved?: boolean
+  num_ticket?: number
 }
 
-// Sample categories for demo with display names
-const EVENT_CATEGORIES = [
-  { id: 'all', name: '全部活動' },
-  { id: 'concert', name: '演唱會' },
-  { id: 'sports', name: '體育賽事' },
-  { id: 'theater', name: '戲劇表演' },
-  { id: 'exhibition', name: '展覽' },
-  { id: 'seminar', name: '講座' }
-];
+
 const Home: React.FC = () => {
   // const { isLoggedIn } = useAuth() // isLoggedIn was unused
   const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedCategory, setSelectedCategory] = useState('all')
-
+  const jwtToken  = localStorage.getItem('jwt_token')
   // Fetch activities from API
   useEffect(() => {
+
     const fetchActivities = async () => {
       try {
         setLoading(true)
-        const response = await fetch(`${API_URL}/activities`, {
+        const response = await fetch('/activities/', {
           method: 'GET',
-          headers: {
+          headers: { 
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${jwtToken}`
           },
         })
 
         if (response.ok) {
           const data = await response.json()
-          
-          // Add random categories and featured status for demo purposes
-          // In a real app, these would come from the backend
-          const activitiesWithCategories = data.activities.map((activity: Activity, index: number) => ({
-            ...activity,
-            category: EVENT_CATEGORIES[Math.floor(Math.random() * (EVENT_CATEGORIES.length - 1)) + 1].id,
-            // Mark first 3 activities as featured for demonstration
-            featured: index < 3
-          }))
-          
-          setActivities(activitiesWithCategories)
-          setError(null)
+          // 假設 API 直接返回活動數組，如果不是，請根據 console.log 的結果調整
+          if (Array.isArray(data)) {
+            setActivities(data)
+          } else if (data && Array.isArray(data.activities)) {
+            setActivities(data.activities)
+          } else {
+            console.error('API 返回的數據格式不符合預期:', data);
+            setActivities([]); // 設置為空數組以避免 map 錯誤
+            setError('無法正確解析活動數據。');
+          }
         } else {
           setError('無法載入活動資訊，請稍後再試。')
           console.error('Failed to fetch activities:', response.statusText)
@@ -83,19 +63,12 @@ const Home: React.FC = () => {
       }
     }
 
-    fetchActivities()
-  }, [])
+    if (jwtToken) { // 只在有 token 時才獲取數據
+      fetchActivities()
+    }
+  }, [jwtToken]) // 添加 jwtToken 到依賴數組
 
-  // Filter activities by category if selected
-  const filteredActivities = selectedCategory === 'all'
-    ? activities
-    : activities.filter(activity => activity.category === selectedCategory)
-
-  // Get featured activities
-  const featuredActivities = useMemo(() => {
-    return activities.filter(activity => activity.featured)
-  }, [activities])
-
+  
   // Loading state
   if (loading) {
     return (
@@ -136,76 +109,31 @@ const Home: React.FC = () => {
         </p>
       </div>
       
-      {/* Category Filter Buttons */}
-      <div className="filter-container mb-4">
-        {EVENT_CATEGORIES.map(category => (
-          <button
-            key={category.id}
-            className={`filter-button ${selectedCategory === category.id ? 'active' : ''}`}
-            onClick={() => setSelectedCategory(category.id)}
-          >
-            {category.name}
-          </button>
-        ))}
-      </div>
+    
       
       {/* Featured Events Section - Only show if there are featured events and we're viewing all categories */}
-      {featuredActivities.length > 0 && selectedCategory === 'all' && (
+   
         <section className="mb-5">
           <h2 className="section-title">精選活動</h2>
           <div className="featured-events-slider">
-            {featuredActivities.map((activity) => (
+            {activities.map((activity) => {
+              return (
               <Widget
-                key={activity._id}
-                id={activity._id}
+                key={activity.id}
+                id={activity.id}
                 path={'activity'}
                 name={activity.title}
                 on_sale_date={activity.on_sale_date}
                 start_date={activity.start_time}
                 end_date={activity.end_time}
-                imageUrl={activity.cover_img}
-                category={activity.category}
-                featured={true}
+                imageUrl={activity.cover_image}
               />
-            ))}
+            )
+          })}
           </div>
         </section>
-      )}
-      
-      {/* All Events Section */}
-      <section className="mb-5">
-        <h2 className="section-title">
-          {selectedCategory === 'all' 
-            ? '所有活動' 
-            : EVENT_CATEGORIES.find(c => c.id === selectedCategory)?.name || '活動'}
-        </h2>
-        
-        {/* Empty State */}
-        {filteredActivities.length === 0 && (
-          <div className="empty-state bg-light p-5 text-center rounded">
-            <p>尚無{selectedCategory !== 'all' ? EVENT_CATEGORIES.find(c => c.id === selectedCategory)?.name : ''}節目</p>
-          </div>
-        )}
-        
-        {/* Event Grid */}
-        {filteredActivities.length > 0 && (
-          <div className="event-grid">
-            {filteredActivities.map((activity) => (
-              <Widget
-                key={activity._id}
-                id={activity._id}
-                path={'activity'}
-                name={activity.title}
-                on_sale_date={activity.on_sale_date}
-                start_date={activity.start_time}
-                end_date={activity.end_time}
-                imageUrl={activity.cover_img}
-                category={activity.category}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+
+     
     </div>
   )
 }

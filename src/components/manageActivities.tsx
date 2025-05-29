@@ -16,7 +16,7 @@ interface Activity {
   end_time: string
   title: string
   content: string
-  cover_img: { type: string; data: number[] }
+  cover_img: string
   price_level_img: { type: string; data: number[] }
   arena_id: string
   creator_id: string
