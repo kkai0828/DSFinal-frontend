@@ -33,20 +33,30 @@ const Registration: React.FC = () => {
     setPersonalData({ ...personalData, [name]: value })
   }
 
-  const handleSubmitAccount = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (accountData.password !== accountData.confirmPassword) {
-      setError('密碼不一致')
-      return
-    }
-    setError('')
-    setStep(2)
-  }
-
   const handleSubmitPersonal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
     setSuccess('')
+
+    // 驗證 email 格式
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(accountData.email)) {
+      setError('請輸入有效的電子郵件地址')
+      return
+    }
+
+    // 驗證電話號碼格式（台灣手機號碼格式）
+    const phoneRegex = /^09\d{8}$/
+    if (!phoneRegex.test(personalData.phone)) {
+      setError('請輸入有效的手機號碼（格式：0912345678）')
+      return
+    }
+
+    // 檢查密碼和確認密碼是否一致
+    if (accountData.password !== accountData.confirmPassword) {
+      setError('密碼與確認密碼不一致')
+      return
+    }
 
     const registrationData = {
       email: accountData.email,
@@ -66,20 +76,56 @@ const Registration: React.FC = () => {
       })
 
       if (!response.ok) {
-        const errorText = await response.text() // Get error text from backend
-        // Attempt to parse as JSON if backend sends structured error, otherwise use text
+        let backendErrorMessage = '註冊失敗，請檢查您的資料'; // Default message
+        // Try to parse JSON error response first
         try {
-          const errorJson = JSON.parse(errorText);
-          throw new Error(errorJson.detail || errorJson.message || errorText); // Use detail or message if available
-        } catch (parseError) {
-          throw new Error(errorText || '註冊失敗，請檢查您的資料');
+          const errorData = await response.json();
+          if (errorData && (errorData.detail || errorData.message)) {
+            backendErrorMessage = errorData.detail || errorData.message;
+          } else if (response.statusText) { // Fallback to statusText if JSON is empty or not structured as expected
+            backendErrorMessage = response.statusText;
+          }
+        } catch (jsonError) {
+          // If response.json() fails (e.g., response is not JSON or empty), try to get raw text.
+          try {
+            const errorText = await response.text();
+            if (errorText) {
+              backendErrorMessage = errorText;
+            } else if (response.statusText) { // Fallback if text is empty but statusText exists
+                backendErrorMessage = response.statusText;
+            }
+          } catch (textError) {
+            // If both parsing attempts fail, rely on response.statusText if available
+            if (response.statusText) {
+                backendErrorMessage = response.statusText;
+            }
+          }
         }
+
+        switch (response.status) {
+          case 400: // Bad Request
+            setError(`輸入資料有誤 (錯誤碼 ${response.status}): ${backendErrorMessage}`);
+            break;
+          case 401: // Unauthorized
+             setError(`未授權 (錯誤碼 ${response.status}): ${backendErrorMessage}，請檢查您的憑證。`);
+            break;
+          case 409: // Conflict (e.g., email or username already exists)
+            setError(`註冊衝突 (錯誤碼 ${response.status}): ${backendErrorMessage} (例如：該電子郵件或用戶名可能已被註冊)`);
+            break;
+          case 500: // Internal Server Error
+            setError(`伺服器錯誤 (錯誤碼 ${response.status}): ${backendErrorMessage}，請稍後再試`);
+            break;
+          default: // Other client or server errors
+            setError(`註冊失敗 (錯誤碼 ${response.status}): ${backendErrorMessage}`);
+        }
+        return; // Stop further processing in the try block
       }
 
       const responseData = await response.json() // Assuming backend returns JSON on success
       
-      setSuccess(`用户 ${responseData.username || registrationData.username} 注册成功!`)
-      setStep(3)
+      let successMessage = `用戶 ${responseData.username || registrationData.username} 註冊成功!`
+      alert(successMessage)
+      navigate('/login')
 
     } catch (err: any) {
       if (err instanceof Error) {
@@ -97,17 +143,44 @@ const Registration: React.FC = () => {
       {error && <p style={{ color: 'red' }}>{error}</p>}
       {success && <p style={{ color: 'green' }}>{success}</p>}
 
-      {step === 1 && (
-        <form onSubmit={handleSubmitAccount}>
+      
           <div>
             <label>帳號</label>
             <input
-              type="text"
+              type="email"
               name="email"
               value={accountData.email}
               onChange={handleAccountChange}
               required
               className="input-region"
+              placeholder='請輸入電子郵件'
+            />
+          </div>
+          <div>
+            <label>姓名</label>
+            <input
+              type="text"
+              name="name"
+              value={personalData.name}
+              onChange={handlePersonalChange}
+              required
+              className="input-region"
+            />
+          </div>
+          <div>
+            <label>手機</label>
+            <input
+              type="tel"
+              name="phone"
+              value={personalData.phone}
+              onChange={handlePersonalChange}
+              required
+              className="input-region"
+              placeholder="請輸入手機號碼（格式：0912345678）"
+              pattern="09[0-9]{8}"
+              minLength={10}
+              maxLength={10}
+              title="請輸入有效的台灣手機號碼（例如：0912345678）"
             />
           </div>
           <div>
@@ -132,60 +205,12 @@ const Registration: React.FC = () => {
               className="input-region"
             />
           </div>
-          <button type="submit">下一步</button>
-        </form>
-      )}
-
-      {step === 2 && (
-        <form onSubmit={handleSubmitPersonal}>
-          <div>
-            <label>姓名</label>
-            <input
-              type="text"
-              name="name"
-              value={personalData.name}
-              onChange={handlePersonalChange}
-              required
-              className="input-region"
-            />
-          </div>
-          <div>
-            <label>手機</label>
-            <input
-              type="text"
-              name="phone"
-              value={personalData.phone}
-              onChange={handlePersonalChange}
-              required
-              className="input-region"
-            />
-          </div>
-          <button type="button" onClick={() => setStep(1)}>
-            上一步
-          </button>
-          <button type="submit">下一步</button>
-        </form>
-      )}
-
-      {step === 3 && (
-        <div>
-          <h3>確認資訊</h3>
-          <p>帳號: {accountData.email}</p>
-          <p>姓名: {personalData.name}</p>
-          <p>手機: {personalData.phone}</p>
-          <button
-            onClick={() => {
-              alert('註冊完成')
-              navigate('/login') // 導向到登入頁面
-            }}
-          >
+          
+          <form onSubmit={handleSubmitPersonal}>
+          <button type="submit">
             確認註冊
           </button>
-          <button type="button" onClick={() => setStep(2)}>
-            上一步
-          </button>
-        </div>
-      )}
+          </form>
     </div>
   )
 }
