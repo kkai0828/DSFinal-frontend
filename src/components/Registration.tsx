@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 // import AuthService from '../services/auth-services' // Removed import
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost' // Added API_URL definition
+// API requests will use the proxy defined in package.json
 
 const Registration: React.FC = () => {
   const [step, setStep] = useState(1)
@@ -57,7 +57,7 @@ const Registration: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`${API_URL}/auth/`, { // Changed to /auth/ based on typical REST and previous findings
+      const response = await fetch('/auth/', { // Using relative path which will be proxied to backend
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

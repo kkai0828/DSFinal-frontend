@@ -18,7 +18,7 @@ const Login: React.FC = () => {
 
     try {
       // Step 1: Login to get the access token
-      const loginResponse = await fetch(API_URL + '/auth/login', {
+      const loginResponse = await fetch('/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -46,7 +46,7 @@ const Login: React.FC = () => {
         const token = loginData.access_token
 
         // Step 2: Get user info using the token
-        const userInfoResponse = await fetch(API_URL + '/auth/get_user_info', {
+        const userInfoResponse = await fetch('/auth/get_user_info', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
