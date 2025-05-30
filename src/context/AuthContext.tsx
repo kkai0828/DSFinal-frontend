@@ -12,14 +12,14 @@ interface AuthContextType {
   isLoggedIn: boolean
   email: string | null
   name: string | null
-  role: 'user' | 'host' | 'admin' | null
+  role: 'client' | 'host' |  null
   phone: string | null
   userId: string | null
   login: (
     token: string,
     email: string,
     name: string,
-    role: 'user' | 'host' | 'admin',
+    role: 'client' | 'host' ,
     phone: string,
     userId: string
   ) => void
@@ -36,7 +36,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [email, setEmail] = useState<string | null>(null)
   const [name, setName] = useState<string | null>(null)
-  const [role, setRole] = useState<'user' | 'host' | 'admin' | null>(null)
+  const [role, setRole] = useState<'client' | 'host' | null>(null)
   const [phone, setPhone] = useState<string | null>(null)
   const [jwtToken, setJwtToken] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
@@ -45,7 +45,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const token = localStorage.getItem('jwt_token')
     const savedEmail = localStorage.getItem('email')
     const savedName = localStorage.getItem('name')
-    const savedRole = localStorage.getItem('role') as 'user' | 'host' | 'admin' | null
+    const savedRole = localStorage.getItem('role') as 'client' | 'host' | null
     const savedPhone = localStorage.getItem('phone')
     const savedUserId = localStorage.getItem('userId')
 
@@ -64,7 +64,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     token: string,
     email: string,
     name: string,
-    role: 'user' | 'host' | 'admin',
+    role: 'client' | 'host' ,
     phone: string,
     userId: string
   ) => {
