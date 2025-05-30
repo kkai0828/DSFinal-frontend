@@ -4,16 +4,16 @@ import { useAuth } from '../context/AuthContext'
 const API_URL = process.env.REACT_APP_API_URL
 
 const UserSettings: React.FC = () => {
-  const { name, login } = useAuth() // 从 AuthContext 获取 name 和 login 方法
-  const [currentName, setCurrentName] = useState<string>(name || '')
+  const { username, login } = useAuth() // 从 AuthContext 获取 name 和 login 方法
+  const [currentName, setCurrentName] = useState<string>(username || '')
   const [phone, setPhone] = useState<string>(
-    localStorage.getItem('phone') || ''
+    localStorage.getItem('phone_number') || ''
   )
   const [email] = useState<string>(localStorage.getItem('email') || '')
 
   useEffect(() => {
-    setCurrentName(name || '')
-  }, [name])
+    setCurrentName(username || '')
+  }, [username])
 
   const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,8 +47,8 @@ const UserSettings: React.FC = () => {
       const updatedUser = await response.json()
 
       // 保存更新後的用戶資訊到本地存儲
-      localStorage.setItem('name', updatedUser.username)
-      localStorage.setItem('phone', updatedUser.phone_number)
+      localStorage.setItem('username', updatedUser.username)
+      localStorage.setItem('phone_number', updatedUser.phone_number)
       // Note: The PUT /auth endpoint might not return the full user object with id.
       // We should rely on the userId already in localStorage from the initial login.
       const userId = localStorage.getItem('userId');

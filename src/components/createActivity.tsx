@@ -24,6 +24,9 @@ const CreateActivity = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [uploadMode, setUploadMode] = useState<'url' | 'file'>('url')
   const [imageError, setImageError] = useState<string | null>(null)
+  const [timeErrors, setTimeErrors] = useState<{[key: string]: string}>({})
+  const [contentLength, setContentLength] = useState(0)
+  const MAX_CONTENT_LENGTH = 300
   const navigate = useNavigate()
   
   // 獲取場館列表
@@ -55,8 +58,168 @@ const CreateActivity = () => {
     return <h2>權限不足：需要主辦方權限</h2>
   }
   
+  // 驗證時間是否晚於當前時間
+  const validateFutureTime = (timeStr: string, fieldName: string): boolean => {
+    if (!timeStr) return true; // 如果未填寫，暫不驗證
+    
+    const selectedTime = new Date(timeStr);
+    const now = new Date();
+    
+    // 檢查是否為有效日期
+    if (isNaN(selectedTime.getTime())) {
+      return false;
+    }
+    
+    // 檢查是否晚於當前時間
+    if (selectedTime <= now) {
+      setTimeErrors(prev => ({
+        ...prev,
+        [fieldName]: `${fieldName}必須晚於當前時間`
+      }));
+      return false;
+    }
+    
+    // 如果該字段沒有錯誤，從錯誤對象中移除
+    setTimeErrors(prev => {
+      const newErrors = {...prev};
+      delete newErrors[fieldName];
+      return newErrors;
+    });
+    
+    return true;
+  };
+
+  // 驗證開始時間和結束時間的先後順序
+  const validateTimeOrder = (startTime: string, endTime: string): boolean => {
+    if (!startTime || !endTime) return true; // 如果有一個未填寫，暫不驗證
+    
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    
+    // 檢查是否為有效日期
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return false;
+    }
+    
+    // 檢查開始時間是否早於結束時間
+    if (start >= end) {
+      setTimeErrors(prev => ({
+        ...prev,
+        timeOrder: '開始時間必須早於結束時間'
+      }));
+      return false;
+    }
+    
+    // 如果沒有順序錯誤，從錯誤對象中移除
+    setTimeErrors(prev => {
+      const newErrors = {...prev};
+      delete newErrors.timeOrder;
+      return newErrors;
+    });
+    
+    return true;
+  };
+
+  // 驗證開賣日是否早於開始時間
+  const validateOnSaleBeforeStart = (onSaleDate: string, startTime: string): boolean => {
+    if (!onSaleDate || !startTime) return true; // 如果有一個未填寫，暫不驗證
+
+    const onSale = new Date(onSaleDate);
+    const start = new Date(startTime);
+
+    // 檢查是否為有效日期
+    if (isNaN(onSale.getTime()) || isNaN(start.getTime())) {
+      return false;
+    }
+
+    // 檢查開賣日是否早於開始時間
+    if (onSale >= start) {
+      setTimeErrors(prev => ({
+        ...prev,
+        onSaleTimeOrder: '開賣日必須早於開始時間'
+      }));
+      return false;
+    }
+
+    // 如果沒有順序錯誤，從錯誤對象中移除
+    setTimeErrors(prev => {
+      const newErrors = {...prev};
+      delete newErrors.onSaleTimeOrder;
+      return newErrors;
+    });
+
+    return true;
+  };
+
+  // 修改開始時間處理函數
+  const handleStartTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newStartTime = e.target.value;
+    setStartTime(newStartTime);
+    
+    // 驗證時間是否晚於當前時間
+    validateFutureTime(newStartTime, '開始時間');
+    
+    // 驗證時間順序
+    if (end_time) {
+      validateTimeOrder(newStartTime, end_time);
+    }
+    // 驗證開賣日是否早於開始時間
+    if (on_sale_date) {
+      validateOnSaleBeforeStart(on_sale_date, newStartTime);
+    }
+  };
+
+  // 修改結束時間處理函數
+  const handleEndTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEndTime = e.target.value;
+    setEndTime(newEndTime);
+    
+    // 驗證時間是否晚於當前時間
+    validateFutureTime(newEndTime, '結束時間');
+    
+    // 驗證時間順序
+    if (start_time) {
+      validateTimeOrder(start_time, newEndTime);
+    }
+  };
+
+  // 修改開賣日處理函數
+  const handleOnSaleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newOnSaleDate = e.target.value;
+    setOnSaleDate(newOnSaleDate);
+    
+    // 驗證時間是否晚於當前時間
+    validateFutureTime(newOnSaleDate, '開賣日');
+    // 驗證開賣日是否早於開始時間
+    if (start_time) {
+      validateOnSaleBeforeStart(newOnSaleDate, start_time);
+    }
+  };
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // 重置錯誤
+    setTimeErrors({})
+    
+    // 驗證所有時間是否晚於當前時間
+    const startTimeValid = validateFutureTime(start_time, '開始時間')
+    const endTimeValid = validateFutureTime(end_time, '結束時間')
+    const onSaleDateValid = validateFutureTime(on_sale_date, '開賣日')
+    
+    // 驗證開始時間和結束時間的順序
+    const timeOrderValid = validateTimeOrder(start_time, end_time)
+
+    // 驗證開賣日是否早於開始時間
+    const onSaleBeforeStartValid = validateOnSaleBeforeStart(on_sale_date, start_time)
+    
+    // 如果有任何時間驗證失敗
+    if (!startTimeValid || !endTimeValid || !onSaleDateValid || !timeOrderValid || !onSaleBeforeStartValid) {
+      // 滾動到錯誤信息
+      document.getElementById('time-errors')?.scrollIntoView({ behavior: 'smooth' })
+      return
+    }
+    
     if (
       !title ||
       !content ||
@@ -71,7 +234,6 @@ const CreateActivity = () => {
       return
     }
     
-
     const activityData = { 
       title: title,
       content: content,
@@ -185,9 +347,24 @@ const CreateActivity = () => {
     }
   };
 
+  // 處理說明內容變更，並計算字數
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const text = e.target.value;
+    const length = text.length;
+    
+    // 如果超過字數限制，截斷文字
+    if (length > MAX_CONTENT_LENGTH) {
+      setContent(text.substring(0, MAX_CONTENT_LENGTH));
+      setContentLength(MAX_CONTENT_LENGTH);
+    } else {
+      setContent(text);
+      setContentLength(length);
+    }
+  };
+
   return (
     <div className="create-activity-container">
-      <p className="page-title">管理 / 新增活動</p>
+      <p className="page-title">新增活動</p>
       <form onSubmit={handleSubmit} encType="multipart/form-data">
         <div className="input-group">
           <label htmlFor="title">活動名稱：</label>
@@ -206,10 +383,34 @@ const CreateActivity = () => {
           <textarea
             id="content"
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={handleContentChange}
             required
             className="textarea"
+            placeholder="請輸入活動說明，最多300字"
+            maxLength={MAX_CONTENT_LENGTH}
+            style={{ 
+              border: contentLength >= MAX_CONTENT_LENGTH ? '1px solid #c62828' : undefined 
+            }}
           ></textarea>
+          <p style={{ 
+            fontSize: '0.85em', 
+            color: '#666', 
+            margin: '5px 0 0 0',
+            display: 'flex',
+            justifyContent: 'space-between'
+          }}>
+            <span>請簡要描述活動內容、特色及須知</span>
+            <span style={{ 
+              color: contentLength >= MAX_CONTENT_LENGTH ? '#c62828' : contentLength >= MAX_CONTENT_LENGTH * 0.9 ? '#ff9800' : '#666'
+            }}>
+              {contentLength >= MAX_CONTENT_LENGTH ? 
+                '已達字數上限' : 
+                contentLength >= MAX_CONTENT_LENGTH * 0.9 ? 
+                '接近字數上限' : 
+                `還可輸入${MAX_CONTENT_LENGTH - contentLength}字`
+              }
+            </span>
+          </p>
         </div>
         <div className="input-group">
           <label htmlFor="price">價格：</label>
@@ -230,10 +431,15 @@ const CreateActivity = () => {
             type="datetime-local"
             id="start_time"
             value={start_time}
-            onChange={(e) => setStartTime(e.target.value)}
+            onChange={handleStartTimeChange}
             required
             className="input"
           />
+          {timeErrors['開始時間'] && (
+            <p style={{ color: '#c62828', margin: '5px 0 0 0', fontSize: '0.9em' }}>
+              {timeErrors['開始時間']}
+            </p>
+          )}
         </div>
 
         <div className="input-group">
@@ -242,10 +448,15 @@ const CreateActivity = () => {
             type="datetime-local"
             id="end_time"
             value={end_time}
-            onChange={(e) => setEndTime(e.target.value)}
+            onChange={handleEndTimeChange}
             required
             className="input"
           />
+          {timeErrors['結束時間'] && (
+            <p style={{ color: '#c62828', margin: '5px 0 0 0', fontSize: '0.9em' }}>
+              {timeErrors['結束時間']}
+            </p>
+          )}
         </div>
 
         <div className="input-group">
@@ -254,10 +465,15 @@ const CreateActivity = () => {
             type="datetime-local"
             id="on_sale_date"
             value={on_sale_date}
-            onChange={(e) => setOnSaleDate(e.target.value)}
+            onChange={handleOnSaleDateChange}
             required
             className="input"
           />
+          {timeErrors['開賣日'] && (
+            <p style={{ color: '#c62828', margin: '5px 0 0 0', fontSize: '0.9em' }}>
+              {timeErrors['開賣日']}
+            </p>
+          )}
         </div>
 
         <div className="input-group">
@@ -271,7 +487,7 @@ const CreateActivity = () => {
             className="select"
           >
             <option value="">選擇場館</option>
-            {arenas.map((arena) => (
+            {Array.isArray(arenas) && arenas.length > 0 && arenas.map((arena) => (
               <option key={arena.id} value={arena.id}>
                 {arena.title} 
               </option>
@@ -283,7 +499,7 @@ const CreateActivity = () => {
           <label htmlFor="cover_image">封面圖片：</label>
           
           {/* 上傳模式切換 */}
-          <div style={{ marginBottom: '10px' }}>
+          {/* <div style={{ marginBottom: '10px' }}>
             <button 
               type="button" 
               onClick={() => setUploadMode('url')}
@@ -313,7 +529,7 @@ const CreateActivity = () => {
             >
               本地上傳
             </button>
-          </div>
+          </div> */}
           
           {/* URL輸入模式 */}
           {uploadMode === 'url' && (
@@ -392,6 +608,26 @@ const CreateActivity = () => {
           </div>
         </div>
         
+        {/* 顯示時間錯誤信息 */}
+        {Object.keys(timeErrors).length > 0 && (
+          <div 
+            id="time-errors"
+            style={{ 
+              padding: '10px', 
+              backgroundColor: '#ffebee', 
+              color: '#c62828', 
+              borderRadius: '4px',
+              marginBottom: '15px' 
+            }}
+          >
+            <p style={{ fontWeight: 'bold', margin: '0 0 5px 0' }}>時間設定錯誤：</p>
+            <ul style={{ margin: 0, paddingLeft: '20px' }}>
+              {Object.entries(timeErrors).map(([key, error]) => (
+                <li key={key}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <button type="submit" className="submit-button">
           確認新增

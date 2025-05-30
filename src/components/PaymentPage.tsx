@@ -20,7 +20,7 @@ interface Region {
 */
 const PaymentPage: React.FC = () => {
   const { id } = useParams()
-  const { jwtToken, name, phone } = useAuth()
+  const { jwtToken, username, phone_number } = useAuth()
   const [ticket, setTicket] = useState<Ticket>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -166,11 +166,11 @@ const PaymentPage: React.FC = () => {
         </p>
         <p>
           <strong>姓名: </strong>
-          {name}
+          {username}
         </p>
         <p>
           <strong>電話: </strong>
-          {phone}
+          {phone_number}
         </p>
 
         <div style={{ marginTop: '20px' }}>

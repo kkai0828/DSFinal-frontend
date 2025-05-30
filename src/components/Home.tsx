@@ -1,6 +1,7 @@
 // src/components/Home.tsx
 import React, { useState, useEffect} from 'react'
 import Widget from './widget'
+import { useAuth } from '../context/AuthContext'
 
 
 interface Activity {
@@ -20,17 +21,14 @@ interface Activity {
 
 
 const Home: React.FC = () => {
-  // const { isLoggedIn } = useAuth() // isLoggedIn was unused
+  const { jwtToken } = useAuth()
   const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const jwtToken  = localStorage.getItem('jwt_token')
-  // Fetch activities from API
-  useEffect(() => {
 
+  useEffect(() => {
     const fetchActivities = async () => {
       try {
-        setLoading(true)
         const response = await fetch('/activities/', {
           method: 'GET',
           headers: { 
@@ -41,32 +39,37 @@ const Home: React.FC = () => {
 
         if (response.ok) {
           const data = await response.json()
-          // 假設 API 直接返回活動數組，如果不是，請根據 console.log 的結果調整
           if (Array.isArray(data)) {
             setActivities(data)
           } else if (data && Array.isArray(data.activities)) {
             setActivities(data.activities)
           } else {
-            console.error('API 返回的數據格式不符合預期:', data);
-            setActivities([]); // 設置為空數組以避免 map 錯誤
-            setError('無法正確解析活動數據。');
+            console.error('API 返回的數據格式不符合預期:', data)
+            setActivities([])
+            setError('無法正確解析活動數據。')
           }
         } else {
           setError('無法載入活動資訊，請稍後再試。')
           console.error('Failed to fetch activities:', response.statusText)
+          setActivities([])
         }
       } catch (error) {
         setError('發生錯誤，請稍後再試。')
         console.error('Error fetching activities:', error)
+        setActivities([])
       } finally {
         setLoading(false)
       }
     }
 
-    if (jwtToken) { // 只在有 token 時才獲取數據
+    if (jwtToken) {
+      setLoading(true)
       fetchActivities()
+    } else {
+      setLoading(false)
+      setActivities([])
     }
-  }, [jwtToken]) // 添加 jwtToken 到依賴數組
+  }, [jwtToken])
 
   
   // Loading state
@@ -94,6 +97,25 @@ const Home: React.FC = () => {
     )
   }
 
+  // 如果沒有 token 並且沒有加載，可以顯示一個不同的視圖或提示用戶登錄
+  if (!jwtToken && !loading && !error) {
+    return (
+      <div className="home-page text-center">
+        <div className="breadcrumb mb-3">
+          <p>首頁 / 節目資訊</p>
+        </div>
+        <div className="hero-banner mb-5">
+          <h1 className="hero-title">探索精彩活動</h1>
+          <p className="hero-subtitle">
+            從音樂會、戲劇表演到體育賽事，tixkraft為您帶來最好的現場體驗
+          </p>
+        </div>
+        <p>請先<a href="/login">登入</a>以查看更多活動。</p>
+        {/* 或者顯示一些公開的、不需要登錄的活動 */}
+      </div>
+    )
+  }
+
   return (
     <div className="home-page">
       {/* Breadcrumb */}
@@ -109,31 +131,32 @@ const Home: React.FC = () => {
         </p>
       </div>
       
-    
-      
-      {/* Featured Events Section - Only show if there are featured events and we're viewing all categories */}
-   
+      {/* Featured Events Section */}
+      {Array.isArray(activities) && activities.length > 0 ? (
         <section className="mb-5">
           <h2 className="section-title">精選活動</h2>
           <div className="featured-events-slider">
-            {activities.map((activity) => {
-              return (
+            {activities.map((activity) => (
               <Widget
                 key={activity.id}
                 id={activity.id}
                 path={'activity'}
-                name={activity.title}
+                title={activity.title}
                 on_sale_date={activity.on_sale_date}
                 start_date={activity.start_time}
                 end_date={activity.end_time}
                 imageUrl={activity.cover_image}
               />
-            )
-          })}
+            ))}
           </div>
         </section>
-
-     
+      ) : (
+        !loading && !error && (
+          <div className="text-center">
+            <p>目前沒有精選活動，敬請期待！</p>
+          </div>
+        )
+      )}
     </div>
   )
 }

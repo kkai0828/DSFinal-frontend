@@ -13,9 +13,9 @@ const CATEGORY_MAP: {[key: string]: {name: string, color: string}} = {
 
 interface WidgetProps {
   id: string
+  title: string
   path: string
   imageUrl: string
-  name: string
   on_sale_date: string
   start_date: string
   end_date: string
@@ -25,7 +25,7 @@ interface WidgetProps {
 
 function Widget({
   imageUrl,
-  name,
+  title,
   on_sale_date,
   start_date,
   end_date,
@@ -71,8 +71,7 @@ function Widget({
       {/* Content area */}
       <div className="widget-content">
         <p className="widget-date">{dateDisplay}</p>
-        <h3 className="widget-name">{name}</h3>
-        
+        <h3 className="widget-name">{title}</h3>
         {/* On sale status */}
         <div className="widget-status">
           {new Date(on_sale_date) > new Date() ? (

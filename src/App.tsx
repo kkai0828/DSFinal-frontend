@@ -198,7 +198,7 @@ const App: React.FC = () => {
 
 // 顯示用戶名稱或登入按鈕的組件
 const LoginDisplay: React.FC = () => {
-  const { isLoggedIn, name, logout } = useAuth();
+  const { isLoggedIn, username, logout } = useAuth();
   const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
   
@@ -238,7 +238,7 @@ const LoginDisplay: React.FC = () => {
             <div className="dropdown-menu" onMouseEnter={handleMouseEnter}>
               <ul className="dropdown-list">
                 <li className="dropdown-item dropdown-user-info">
-                  <p>{name}</p>
+                  <p>{username}</p>
                 </li>
                 <li className="dropdown-item">
                   <Link to="/settings" className="dropdown-link">
