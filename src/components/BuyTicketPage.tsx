@@ -1,248 +1,342 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { getArena } from '../context/kits'
+import { formatDate } from '../context/kits'
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost'
+const MAX_TICKETS_PER_USER = 4
 
-interface Arena {
-  _id: string
+interface ActivityDetails {
+  id: string
   title: string
-  address: string
-  capacity: number
-}
-
-interface Activity {
-  _id: string
-  on_sale_date: string
   start_time: string
   end_time: string
-  title: string
-  content: string
-  cover_img: { type: string; data: number[] }
-  price_level_img: { type: string; data: number[] }
-  arena_id: string
-  creator_id: string
-  is_archived: boolean
-  regions: {
-    _id: string
-    region_name: string
-    region_price: number
-    region_capacity: number
-  }[]
+  price: number
+  cover_image: string
 }
 
 const BuyTicketPage: React.FC = () => {
-  const { id } = useParams() // 獲取活動ID
-  const { jwtToken, isLoggedIn } = useAuth()
-  const [activity, setActivity] = useState<Activity | null>(null)
-  const [arena, setArena] = useState<Arena | null>(null)
-  const [selectedRegion, setSelectedRegion] = useState<string>('') // 選擇區域
-  const [ticketQuantity, setTicketQuantity] = useState<number>(1) // 訂票數量
-  const [leftCapacity, setLeftCapacity] = useState<number>(0) // 剩餘座位數
+  const { id: activityId } = useParams<{ id: string }>()
+  const { jwtToken } = useAuth()
   const navigate = useNavigate()
 
-  // 獲取活動資料
-  const fetchActivity = useCallback(async (activityId: string) => {
-    try {
-      const response = await fetch(`${API_URL}/activities/${activityId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setActivity(data.activity)
-        getArena(setArena, data.activity.arena_id)
-      } else {
-        console.error('Failed to fetch activity:', response.statusText)
-      }
-    } catch (error) {
-      console.error('Error fetching activity:', error)
-    }
-  }, [])
+  const [activity, setActivity] = useState<ActivityDetails | null>(null)
+  const [quantity, setQuantity] = useState<number>(1)
+  const [totalPrice, setTotalPrice] = useState<number>(0)
 
-  const fetchTicketByRegion = useCallback(async (regionId: string, isPaid: boolean) => {
-    try {
-      const url = new URL(`${API_URL}/tickets/list-by-region`)
-      url.searchParams.append('region_id', regionId)
-      url.searchParams.append('is_paid', isPaid.toString())
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
 
-      const headers = new Headers()
-      if (jwtToken) {
-        headers.append('Authorization', `${jwtToken}`)
-      } else {
-        console.error('JWT token is not available for fetching tickets by region.');
-        return;
-      }
+  const [purchaseLoading, setPurchaseLoading] = useState<boolean>(false)
+  const [purchaseError, setPurchaseError] = useState<string | null>(null)
 
-      const requestOptions = {
-        method: 'GET',
-        headers: headers,
-      }
-      const response = await fetch(url.toString(), requestOptions)
-      console.log(response)
-
-      if (response.ok) {
-        const data = await response.json()
-        setLeftCapacity(data.tickets.length)
-      } else {
-        console.error('Failed to fetch tickets:', response.statusText)
-      }
-    } catch (error) {
-      console.error('Error fetching ticket:', error)
-    }
-  }, [jwtToken])
-
+  // Effect to fetch activity details
   useEffect(() => {
-    if (id) {
-      fetchActivity(id) // 根據 ID 獲取活動資料
-    }
-  }, [id, fetchActivity])
-
-  useEffect(() => {
-    if (selectedRegion) {
-      fetchTicketByRegion(selectedRegion, false) // 獲取選擇區域的剩餘座位數
-    }
-  }, [selectedRegion, fetchTicketByRegion])
-  // 計算總金額
-  const calculateTotal = () => {
-    if (activity && selectedRegion) {
-      const region = activity.regions.find((r) => r._id === selectedRegion)
-      if (region) {
-        return region.region_price * 1
-      }
-    }
-    return 0
-  }
-
-  // 提交購票
-  const reserveTickets = async () => {
-    if (!selectedRegion) return
-    try {
-      const myHeaders = new Headers()
-      myHeaders.append('Authorization', `${jwtToken}`) // 使用 Context 中的 jwtToken
-      myHeaders.append('Content-Type', 'application/x-www-form-urlencoded')
-
-      const urlencoded = new URLSearchParams()
-      urlencoded.append('region_id', selectedRegion)
-
-      const requestOptions: RequestInit = {
-        method: 'POST',
-        headers: myHeaders,
-        body: urlencoded,
-        redirect: 'follow',
-      }
-
-      const response = await fetch(
-        `${API_URL}/tickets/reserveTicket`,
-        requestOptions
-      )
-
-      if (response.ok) {
-        const result = await response.json()
-        console.log('Reservation success:', result)
-        alert('購票成功！')
-        navigate('/myTicket')
-      } else {
-        console.error('Reservation failed:', response.statusText)
-        alert('購票失敗，請再試一次！')
-      }
-    } catch (error) {
-      console.error('Error reserving ticket:', error)
-      alert('系統錯誤，請稍後再試！')
-    }
-  }
-  const handleBuyTickets = () => {
-    if (!selectedRegion || ticketQuantity <= 0) {
-      alert('請選擇區域')
+    if (!jwtToken) {
+      setError('請先登入才能購票。')
+      setLoading(false)
+      setActivity(null)
       return
     }
-    reserveTickets()
 
-    // 在此執行實際的購票邏輯，如 API 提交等
-  }
+    if (!activityId) {
+      setError('無效的活動 ID。')
+      setLoading(false)
+      setActivity(null)
+      return
+    }
 
-  if (!isLoggedIn) {
+    const fetchActivityDetails = async () => {
+      setLoading(true)
+      setError(null)
+      setActivity(null)
+
+      try {
+        const response = await fetch(`${API_URL}/activities/${activityId}`)
+        if (!response.ok) {
+          let errorDetail = `無法獲取活動詳情 (${response.status})`
+          try {
+            const errorData = await response.json()
+            errorDetail = errorData.detail || errorDetail
+          } catch (jsonError) {
+            errorDetail = response.statusText ? `${errorDetail}: ${response.statusText}` : errorDetail
+          }
+          throw new Error(errorDetail)
+        }
+        const data: ActivityDetails = await response.json()
+        if (data && data.id) {
+          setActivity(data)
+        } else {
+          throw new Error('獲取的活動資料格式不正確或不完整。')
+        }
+      } catch (err: any) {
+        console.error('獲取活動詳情失敗:', err)
+        setError(err.message || '獲取活動數據時發生嚴重錯誤。')
+        setActivity(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchActivityDetails()
+  }, [activityId, jwtToken])
+
+  // Effect to calculate total price
+  useEffect(() => {
+    if (activity && activity.price && quantity > 0) {
+      setTotalPrice(activity.price * quantity)
+    } else {
+      setTotalPrice(0)
+    }
+  }, [activity, quantity])
+
+  const handleQuantityChange = useCallback((amount: number) => {
+    setQuantity(currentQuantity => {
+      const newQuantity = currentQuantity + amount
+      if (newQuantity >= 1 && newQuantity <= MAX_TICKETS_PER_USER) {
+        return newQuantity
+      }
+      return currentQuantity
+    })
+  }, [])
+
+  const handleSubmitPurchase = useCallback(async () => {
+    if (!jwtToken || !activityId || !activity || quantity <= 0) {
+      setPurchaseError('訂單資訊不完整，請確認活動詳情和購買數量。')
+      return
+    }
+
+    setPurchaseLoading(true)
+    setPurchaseError(null)
+
+    console.log('Preparing to purchase:', {
+      activityId: activity.id,
+      title: activity.title,
+      quantity,
+      unitPrice: activity.price,
+      totalPrice: activity.price * quantity,
+    })
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      alert(`模擬購票成功！
+活動：${activity.title}
+數量：${quantity}
+總金額：NT$ ${activity.price * quantity}`)
+      navigate('/manage-tickets')
+    } catch (err: any) {
+      console.error('購票過程中發生錯誤:', err)
+      setPurchaseError(err.message || '購票失敗，請稍後再試或聯繫客服。')
+    } finally {
+      setPurchaseLoading(false)
+    }
+  }, [activity, quantity, jwtToken, activityId, navigate])
+
+  if (!jwtToken) {
     navigate('/login')
   }
-  if (!activity || !arena) {
+  if (loading) {
     return (
-      <div>
-        <p>Loading...</p>
+      <div className="loading-container" style={styles.centeredMessage}>
+        <div className="loading-spinner"></div>
+        <p className="mt-3">載入活動資訊中...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="error-message bg-light p-4 text-center rounded" style={styles.centeredMessage}>
+        <p className="text-danger">{error}</p>
+        <Link to="/" className="btn-primary mt-3">返回首頁</Link>
+        {!jwtToken && activityId && (
+          <Link to={`/login?redirect=/buy-ticket/${activityId}`} className="btn-secondary mt-3 ms-2">
+            前往登入
+          </Link>
+        )}
+      </div>
+    )
+  }
+
+  if (!activity) {
+    return (
+      <div className="error-message bg-light p-4 text-center rounded" style={styles.centeredMessage}>
+        <p>無法載入活動資料，或指定的活動不存在。</p>
+        <Link to="/" className="btn-primary mt-3">返回首頁</Link>
       </div>
     )
   }
 
   return (
-    <div>
-      <h2>{activity.title} - 購票頁面</h2>
-      <p>
-        <strong>地點：</strong>
-        {arena?.title} ({arena?.address})
+    <div style={styles.container}>
+      <p style={styles.breadcrumb}>
+        <Link to="/">首頁</Link> / 
+        <Link to={`/activity/${activityId}`}>{activity.title || '活動詳情'}</Link> / 
+        購票
       </p>
-      <p>{activity.content}</p>
-
-      <div>
-        <label htmlFor="region">選擇區域：</label>
-        <select
-          id="region"
-          value={selectedRegion}
-          onChange={(e) => setSelectedRegion(e.target.value)}
-          required
-        >
-          <option value="">請選擇區域</option>
-          {activity.regions.map((region) => (
-            <option key={region._id} value={region._id}>
-              {region.region_name} - ${region.region_price}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label htmlFor="ticketQuantity">數量：</label>
-        <input
-          type="number"
-          id="ticketQuantity"
-          value={ticketQuantity}
-          onChange={(e) =>
-            setTicketQuantity(Math.max(1, parseInt(e.target.value)))
-          }
-          min="1"
-          disabled
-          required
+      
+      <div style={styles.card}>
+        <img 
+          src={activity.cover_image || '/placeholder-image.png'} 
+          alt={activity.title} 
+          style={styles.image}
+          onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-image.png'; }}
         />
-      </div>
-
-      <div>
-        <p>
-          <strong>剩餘座位數：</strong>
-          {selectedRegion && (
-            <>
-              {leftCapacity}/
-              {activity.regions.find((r) => r._id === selectedRegion)
-                ?.region_capacity || 'N/A'}
-            </>
-          )}
-        </p>{' '}
-        <p>
-          <strong>總金額：</strong>${calculateTotal()}
+        <h1 style={styles.title}>{activity.title}</h1>
+        <p style={styles.detailItem}>
+          <strong>活動時間：</strong>
+          {formatDate(activity.start_time)} - {formatDate(activity.end_time)}
         </p>
-        <p>
-          <strong>regionId：</strong>
-          {selectedRegion}
+        <p style={styles.detailItem}>
+          <strong>單張票價：</strong>NT$ {activity.price}
         </p>
       </div>
 
-      {leftCapacity == 0 ? (
-        <button disabled>已售罄</button>
-      ) : (
-        <button onClick={handleBuyTickets}>立即購票</button>
-      )}
+      <div style={styles.card}>
+        <h2 style={{ textAlign: 'center' as 'center', marginBottom: '20px' }}>選擇數量</h2>
+        <div style={styles.quantityControl}>
+          <button 
+            onClick={() => handleQuantityChange(-1)} 
+            disabled={quantity <= 1 || purchaseLoading}
+            style={styles.quantityButton}
+          >
+            -
+          </button>
+          <span style={styles.quantityDisplay}>{quantity}</span>
+          <button 
+            onClick={() => handleQuantityChange(1)} 
+            disabled={quantity >= MAX_TICKETS_PER_USER || purchaseLoading}
+            style={styles.quantityButton}
+          >
+            +
+          </button>
+        </div>
+        <p style={{ fontSize: '0.9em', color: '#777', textAlign: 'center' as 'center' }}>
+          每帳號限購 {MAX_TICKETS_PER_USER} 張票
+        </p>
+      </div>
+
+      <div style={styles.card}>
+        <div style={styles.totalPrice}>
+          總金額：NT$ {totalPrice}
+        </div>
+        <button 
+          onClick={handleSubmitPurchase} 
+          disabled={purchaseLoading || quantity <= 0 || !activity.price}
+          style={purchaseLoading || !activity.price ? {...styles.button, ...styles.disabledButton} : styles.button}
+        >
+          {purchaseLoading ? '訂單處理中...' : '確認購買'}
+        </button>
+        {purchaseError && <p style={styles.errorMessage}>{purchaseError}</p>}
+      </div>
     </div>
   )
+}
+
+const styles: { [key: string]: React.CSSProperties } = {
+  container: { 
+    padding: '20px', 
+    maxWidth: '700px', 
+    margin: '40px auto',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+  },
+  card: { 
+    border: '1px solid #e0e0e0',
+    borderRadius: '8px', 
+    padding: '25px',
+    marginBottom: '25px', 
+    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+    backgroundColor: '#ffffff'
+  },
+  image: { 
+    width: '100%', 
+    maxHeight: '350px',
+    objectFit: 'cover', 
+    borderRadius: '6px',
+    marginBottom: '20px',
+    border: '1px solid #eee'
+  },
+  title: { 
+    fontSize: '1.75rem',
+    fontWeight: '600',
+    marginBottom: '15px',
+    color: '#333'
+  },
+  detailItem: { 
+    marginBottom: '10px', 
+    fontSize: '1rem',
+    lineHeight: '1.6',
+    color: '#555'
+  },
+  quantityControl: { 
+    display: 'flex', 
+    alignItems: 'center', 
+    margin: '20px 0', 
+    justifyContent: 'center' 
+  },
+  quantityButton: { 
+    fontSize: '1.2rem', 
+    padding: '8px 18px',
+    margin: '0 12px', 
+    cursor: 'pointer', 
+    border: '1px solid #ccc', 
+    borderRadius: '4px', 
+    background: '#f8f8f8',
+    color: '#333',
+    transition: 'background-color 0.2s ease, box-shadow 0.2s ease'
+  },
+  quantityDisplay: { 
+    fontSize: '1.2rem', 
+    fontWeight: '500',
+    minWidth: '40px',
+    textAlign: 'center' as 'center',
+    color: '#333'
+  },
+  totalPrice: { 
+    fontSize: '1.5rem', 
+    fontWeight: '600', 
+    color: '#1a73e8',
+    textAlign: 'right' as 'right', 
+    margin: '20px 0' 
+  },
+  button: { 
+    display: 'block', 
+    width: '100%', 
+    padding: '14px',
+    fontSize: '1.1rem',
+    fontWeight: '600', 
+    color: 'white', 
+    background: '#007bff',
+    border: 'none', 
+    borderRadius: '5px', 
+    cursor: 'pointer', 
+    textAlign: 'center' as 'center',
+    transition: 'background-color 0.2s ease, transform 0.1s ease'
+  },
+  disabledButton: { 
+    background: '#adb5bd',
+    cursor: 'not-allowed',
+  },
+  errorMessage: { 
+    color: '#dc3545',
+    marginTop: '15px', 
+    textAlign: 'center' as 'center',
+    fontSize: '0.95rem'
+  },
+  breadcrumb: { 
+    marginBottom: '25px', 
+    color: '#6c757d',
+    fontSize: '0.9rem'
+  },
+  centeredMessage: {
+    display: 'flex',
+    flexDirection: 'column' as 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 'calc(100vh - 160px)',
+    textAlign: 'center' as 'center',
+    padding: '20px'
+  }
 }
 
 export default BuyTicketPage

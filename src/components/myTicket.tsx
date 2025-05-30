@@ -2,10 +2,9 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost'
 
 interface Ticket {
-  _id: number
+  id: string
   activity_id: string
   region_id: string
   seat_number: number
@@ -13,21 +12,21 @@ interface Ticket {
 }
 
 interface Activity {
-  _id: string
+  id: string
   on_sale_date: string
   start_time: string
   end_time: string
+  price: number
   title: string
   content: string
-  cover_img: { type: string; data: number[] }
-  price_level_img: { type: string; data: number[] }
+  cover_image: string
   arena_id: string
   creator_id: string
   is_archived: boolean
 }
 
 const MyTicket: React.FC = () => {
-  const { isLoggedIn, jwtToken } = useAuth()
+  const { jwtToken } = useAuth()
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -36,7 +35,7 @@ const MyTicket: React.FC = () => {
 
   const fetchActivity = useCallback(async (id: string) => {
     try {
-      const response = await fetch(`${API_URL}/activities/${id}`, {
+      const response = await fetch(`/activities/${id}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -68,7 +67,7 @@ const MyTicket: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`${API_URL}/tickets/list`, {
+      const response = await fetch(`/tickets/list`, {
         method: 'GET',
         headers: {
           Authorization: `${jwtToken}`,
@@ -106,14 +105,14 @@ const MyTicket: React.FC = () => {
   }, [jwtToken, fetchActivity, activities])
 
   useEffect(() => {
-    if (isLoggedIn) {
+    if (jwtToken) {
       fetchTickets()
     } else {
       setError('請先登入以檢視您的訂單。')
       setLoading(false)
       setTickets([])
     }
-  }, [isLoggedIn, fetchTickets])
+  }, [jwtToken, fetchTickets])
 
   const filteredTickets = tickets.filter((ticket) => {
     if (filter === 'paid') return ticket.is_paid
@@ -237,7 +236,7 @@ const MyTicket: React.FC = () => {
             filteredTickets.map((ticket) => {
               const activityData = activities[ticket.activity_id]
               return (
-                <tr key={ticket._id}>
+                <tr key={ticket.id}>
                   <td
                     style={{
                       border: '1px solid #ccc',
@@ -245,7 +244,7 @@ const MyTicket: React.FC = () => {
                       textAlign: 'center',
                     }}
                   >
-                    {ticket._id}
+                    {ticket.id}
                   </td>
                   <td
                     style={{
@@ -291,7 +290,7 @@ const MyTicket: React.FC = () => {
                       }}
                     >
                       <Link
-                        to={`/payment/${ticket._id}`}
+                        to={`/payment/${ticket.id}`}
                         style={{
                           color: '#007bff',
                           textDecoration: 'none',
