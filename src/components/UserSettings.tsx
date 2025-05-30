@@ -19,7 +19,7 @@ const UserSettings: React.FC = () => {
     e.preventDefault()
 
     const token = localStorage.getItem('jwt_token')
-    const role = localStorage.getItem('role') as 'user' | 'host'
+    const role = localStorage.getItem('role') as 'client' | 'host'
 
     if (!token || !role) {
       alert('未找到有效的登入資訊，請重新登入。')
@@ -61,7 +61,7 @@ const UserSettings: React.FC = () => {
 
       // 更新 AuthContext 的用戶資訊
       // The order of arguments for login is: token, email, name, role, phone, userId
-      login(token, email, updatedUser.username, role as 'user' | 'host' | 'admin', updatedUser.phone_number, userId)
+      login(token, email, updatedUser.username, role as 'client' | 'host', updatedUser.phone_number, userId)
 
       alert('資訊更新成功')
     } catch (error: any) {

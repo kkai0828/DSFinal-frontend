@@ -61,7 +61,7 @@ const Registration: React.FC = () => {
       email: accountData.email,
       password: accountData.password,
       username: personalData.name,
-      role: 'user', // Default role
+      role: 'client', // Default role
       phone_number: personalData.phone,
     }
 
