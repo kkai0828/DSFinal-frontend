@@ -22,6 +22,7 @@ import BuyTicketPage from './components/BuyTicketPage'
 import PaymentPage from './components/PaymentPage'
 import ManageActivities from './components/manageActivities'
 import EditActivity from './components/editActivity'
+import CreateArena from './components/createArena'
 
 // Event categories for filters
 const EVENT_CATEGORIES = [
@@ -184,6 +185,7 @@ const App: React.FC = () => {
                 <Route path="/settings/change-password" element={<ChangePassword />} />
                 <Route path="/buy-ticket/:id" element={<BuyTicketPage />} />
                 <Route path="/payment/:id" element={<PaymentPage />} />
+                <Route path="/create-arena" element={<CreateArena />} />
               </Routes>
             </div>
           </main>
@@ -290,6 +292,12 @@ const HostLink: React.FC = () => {
         className={`nav-link ${isActive('/manage-activity')}`}
       >
         管理活動
+      </Link>
+      <Link
+        to="/create-arena"
+        className={`nav-link ${isActive('/create-arena')}`}
+      >
+        新增場館
       </Link>
     </>
   ) : null;
