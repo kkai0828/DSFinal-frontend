@@ -57,11 +57,11 @@ const NavigationLinks: React.FC = () => {
 // Search component for the header
 const SearchBar: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  const navigate = useNavigate();
   
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Searching for:", searchTerm);
-    // navigate(`/search?q=${encodeURIComponent(searchTerm)}`);
+    navigate(`/?q=${encodeURIComponent(searchTerm)}`);
   };
   
   return (

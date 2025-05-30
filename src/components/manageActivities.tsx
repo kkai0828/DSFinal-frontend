@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import Widget from './widget'
 import { useAuth } from '../context/AuthContext'
-
+import { useNavigate } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 
 interface Activity {
   id: string
@@ -22,6 +23,10 @@ const ManageActivities = () => {
   const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchTerm, setSearchTerm] = useState('')
+
+  const searchTermFromUrl = searchParams.get('q') || ''
 
   useEffect(() => {
     const fetchActivities = async () => {
@@ -63,12 +68,35 @@ const ManageActivities = () => {
       fetchActivities()
     }
   }, [jwtToken]) // 添加 jwtToken 到依賴數組
+
+  const filteredActivities = useMemo(() => {
+    if(!searchTermFromUrl) {
+      return activities
+    }
+    return activities.filter(activity =>
+      activity.title.toLowerCase().includes(searchTermFromUrl.toLowerCase())
+    )
+  }, [activities, searchTermFromUrl])
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchParams({q: searchTerm})
+  };
   if (role !== 'host') {
     return <h2>Permissions denied</h2>
   }
   return (
     <div>
-      <p style={{ letterSpacing: '1.3px', color: '#666', fontSize: '14px' }}>
+      <form className="search-container" onSubmit={handleSearch}>
+      <input
+        type="text"
+        className="search-input"
+        placeholder="搜尋活動"
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+      />
+      <span className="search-icon">🔍</span>
+    </form>
+      <p className="section-title">
         管理活動
       </p>
       <div className="featured-events-slider">
@@ -78,7 +106,7 @@ const ManageActivities = () => {
           <p>尚無活動</p>
         )}
         {!loading && !error && Array.isArray(activities) && activities.length > 0 && (
-          activities.map((activity) => (
+          filteredActivities.map((activity) => (
             <Widget
               key={activity.id}
               id={activity.id}

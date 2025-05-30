@@ -1,8 +1,8 @@
 // src/components/Home.tsx
-import React, { useState, useEffect} from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import Widget from './widget'
 import { useAuth } from '../context/AuthContext'
-
+import { useSearchParams } from 'react-router-dom'
 
 interface Activity {
   id: string
@@ -19,15 +19,18 @@ interface Activity {
   num_ticket?: number
 }
 
-
 const Home: React.FC = () => {
   const { jwtToken } = useAuth()
   const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [searchParams] = useSearchParams()
+  const searchTermFromUrl = searchParams.get('q') || ''
 
   useEffect(() => {
     const fetchActivities = async () => {
+      setLoading(true)
+      setError(null)
       try {
         const response = await fetch('/activities/', {
           method: 'GET',
@@ -61,18 +64,18 @@ const Home: React.FC = () => {
         setLoading(false)
       }
     }
-
-    if (jwtToken) {
-      setLoading(true)
-      fetchActivities()
-    } else {
-      setLoading(false)
-      setActivities([])
-    }
+    fetchActivities()
   }, [jwtToken])
 
+  const filteredActivities = useMemo(() => {
+    if (!searchTermFromUrl) {
+      return activities
+    }
+    return activities.filter(activity =>
+      activity.title.toLowerCase().includes(searchTermFromUrl.toLowerCase())
+    )
+  }, [activities, searchTermFromUrl])
   
-  // Loading state
   if (loading) {
     return (
       <div className="loading-container">
@@ -82,7 +85,6 @@ const Home: React.FC = () => {
     )
   }
 
-  // Error state
   if (error) {
     return (
       <div className="error-message bg-light p-4 text-center rounded">
@@ -97,8 +99,7 @@ const Home: React.FC = () => {
     )
   }
 
-  // 如果沒有 token 並且沒有加載，可以顯示一個不同的視圖或提示用戶登錄
-  if (!jwtToken && !loading && !error) {
+  if (!jwtToken && !loading && !error && !searchTermFromUrl) {
     return (
       <div className="home-page text-center">
         <div className="breadcrumb mb-3">
@@ -111,19 +112,16 @@ const Home: React.FC = () => {
           </p>
         </div>
         <p>請先<a href="/login">登入</a>以查看更多活動。</p>
-        {/* 或者顯示一些公開的、不需要登錄的活動 */}
       </div>
     )
   }
 
   return (
     <div className="home-page">
-      {/* Breadcrumb */}
       <div className="breadcrumb mb-3">
         <p>首頁 / 節目資訊</p>
       </div>
 
-      {/* Hero Banner */}
       <div className="hero-banner mb-5">
         <h1 className="hero-title">探索精彩活動</h1>
         <p className="hero-subtitle">
@@ -131,12 +129,17 @@ const Home: React.FC = () => {
         </p>
       </div>
       
-      {/* Featured Events Section */}
-      {Array.isArray(activities) && activities.length > 0 ? (
+      {searchTermFromUrl && (
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <h3>搜尋結果： "{searchTermFromUrl}"</h3>
+        </div>
+      )}
+
+      {Array.isArray(filteredActivities) && filteredActivities.length > 0 ? (
         <section className="mb-5">
           <h2 className="section-title">精選活動</h2>
           <div className="featured-events-slider">
-            {activities.map((activity) => (
+            {filteredActivities.map((activity) => (
               <Widget
                 key={activity.id}
                 id={activity.id}
@@ -153,7 +156,7 @@ const Home: React.FC = () => {
       ) : (
         !loading && !error && (
           <div className="text-center">
-            <p>目前沒有精選活動，敬請期待！</p>
+            <p>{searchTermFromUrl ? '找不到符合條件的活動。' : '目前沒有精選活動，敬請期待！'}</p>
           </div>
         )
       )}
