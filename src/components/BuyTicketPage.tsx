@@ -3,7 +3,6 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { formatDate } from '../context/kits'
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost'
 const MAX_TICKETS_PER_USER = 4
 
 interface ActivityDetails {
@@ -15,9 +14,18 @@ interface ActivityDetails {
   cover_image: string
 }
 
+// Assuming Ticket interface similar to myTicket.tsx for reserved tickets
+interface ReservedTicket {
+  id: string; // This will be the ticket_id for the /buy call
+  user_id: string;
+  activity_id: string;
+  status: string; // e.g., "RESERVED", "UNPAID"
+  // other fields like seat_number, create_at might also be present
+}
+
 const BuyTicketPage: React.FC = () => {
   const { id: activityId } = useParams<{ id: string }>()
-  const { jwtToken } = useAuth()
+  const { jwtToken, userId } = useAuth()
   const navigate = useNavigate()
 
   const [activity, setActivity] = useState<ActivityDetails | null>(null)
@@ -52,7 +60,7 @@ const BuyTicketPage: React.FC = () => {
       setActivity(null)
 
       try {
-        const response = await fetch(`${API_URL}/activities/${activityId}`)
+        const response = await fetch(`/activities/${activityId}`)
         if (!response.ok) {
           let errorDetail = `無法獲取活動詳情 (${response.status})`
           try {
@@ -100,37 +108,52 @@ const BuyTicketPage: React.FC = () => {
     })
   }, [])
 
-  const handleSubmitPurchase = useCallback(async () => {
-    if (!jwtToken || !activityId || !activity || quantity <= 0) {
-      setPurchaseError('訂單資訊不完整，請確認活動詳情和購買數量。')
+  const handleSubmitPurchase = async () => {
+    if (!jwtToken || !userId || !activityId || !activity || quantity <= 0) {
+      setPurchaseError('訂單資訊不完整，請確認活動詳情、購買數量，並確保您已登入。')
       return
     }
 
     setPurchaseLoading(true)
     setPurchaseError(null)
 
-    console.log('Preparing to purchase:', {
-      activityId: activity.id,
-      title: activity.title,
-      quantity,
-      unitPrice: activity.price,
-      totalPrice: activity.price * quantity,
-    })
-
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      alert(`模擬購票成功！
-活動：${activity.title}
-數量：${quantity}
-總金額：NT$ ${activity.price * quantity}`)
-      navigate('/manage-tickets')
+      // Step 1: Reserve tickets
+      const reserveResponse = await fetch('/tickets/reserve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${jwtToken}`,
+        },
+        body: JSON.stringify({
+          user_id: userId, // Sending userId as backend /tickets/reserve expects it
+          activity_id: activityId,
+          num_tickets: quantity,
+        }),
+      })
+
+      if (!reserveResponse.ok) {
+        const errorData = await reserveResponse.json().catch(() => ({}))
+        throw new Error(errorData.detail || `預訂票券失敗 (${reserveResponse.status})`)
+      }
+
+      const reservedTickets: ReservedTicket[] = await reserveResponse.json()
+
+      if (!reservedTickets || reservedTickets.length === 0) {
+        throw new Error('預訂成功，但未收到有效的票券資訊。')
+      }
+
+      // If reserve operation was successful
+      alert(`成功預訂 ${quantity} 張票！\n活動：${activity.title}\n請前往「我的訂單」完成付款。`)
+      navigate('/myTicket') // Navigate to user's tickets page to see unpaid tickets
+
     } catch (err: any) {
-      console.error('購票過程中發生錯誤:', err)
-      setPurchaseError(err.message || '購票失敗，請稍後再試或聯繫客服。')
+      console.error('票券預訂過程中發生錯誤:', err) // Changed error message slightly
+      setPurchaseError(err.message || '票券預訂失敗，請稍後再試或聯繫客服。')
     } finally {
       setPurchaseLoading(false)
     }
-  }, [activity, quantity, jwtToken, activityId, navigate])
+  }
 
   if (!jwtToken) {
     navigate('/login')
@@ -177,10 +200,9 @@ const BuyTicketPage: React.FC = () => {
       
       <div style={styles.card}>
         <img 
-          src={activity.cover_image || '/placeholder-image.png'} 
+          src={activity.cover_image} 
           alt={activity.title} 
           style={styles.image}
-          onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-image.png'; }}
         />
         <h1 style={styles.title}>{activity.title}</h1>
         <p style={styles.detailItem}>

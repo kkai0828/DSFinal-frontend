@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
 
@@ -6,9 +6,10 @@ import { Link } from 'react-router-dom'
 interface Ticket {
   id: string
   activity_id: string
-  region_id: string
-  seat_number: number
-  is_paid: boolean
+  // region_id: string; // Removed as it's not in the API response for /list_tickets
+  seat_number: number // API might return string, ensure conversion if needed
+  status: string // e.g., "UNPAID", "SOLD"
+  // is_paid: boolean; // Replaced by status
 }
 
 interface Activity {
@@ -33,7 +34,7 @@ const MyTicket: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
   const [activities, setActivities] = useState<Record<string, Activity>>({})
 
-  const fetchActivity = useCallback(async (id: string) => {
+  const fetchActivity = async (id: string): Promise<Activity | null> => {
     try {
       const response = await fetch(`/activities/${id}`, {
         method: 'GET',
@@ -41,84 +42,86 @@ const MyTicket: React.FC = () => {
           'Content-Type': 'application/json',
         },
       })
-
       if (response.ok) {
-        const data = await response.json()
-        setActivities((prev) => ({
-          ...prev,
-          [id]: data.activity,
-        }))
+        const data = await response.json();
+        return data
       } else {
-        console.error('Failed to fetch activity details for ID:', id, response.statusText)
+        return null;
       }
-    } catch (error) {
-      console.error('Error fetching activity details for ID:', id, error)
+    } catch (err) {
+      return null;
     }
-  }, [])
-
-  const fetchTickets = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    if (!jwtToken) {
-        setError('用户未认证，无法获取票务信息。');
-        setLoading(false);
-        return;
-    }
-
-    try {
-      const response = await fetch(`/tickets/list`, {
-        method: 'GET',
-        headers: {
-          Authorization: `${jwtToken}`,
-        },
-        redirect: 'follow',
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setTickets(data.tickets)
-
-        const activityIdsToFetch = new Set<string>();
-        data.tickets.forEach((ticket: Ticket) => {
-          if (!activities[ticket.activity_id]) {
-            activityIdsToFetch.add(ticket.activity_id);
-          }
-        });
-        activityIdsToFetch.forEach(activityId => fetchActivity(activityId));
-
-      } else {
-        const errorText = await response.text()
-        if (errorText.includes('No tickets found')) {
-            setTickets([]);
-            setError(null);
-        } else {
-            throw new Error(errorText)
-        }
-      }
-    } catch (error: any) {
-      console.error('Error fetching tickets:', error)
-      setError(error.message || '發生未知錯誤')
-    } finally {
-      setLoading(false)
-    }
-  }, [jwtToken, fetchActivity, activities])
+  }
 
   useEffect(() => {
-    if (jwtToken) {
-      fetchTickets()
-    } else {
-      setError('請先登入以檢視您的訂單。')
-      setLoading(false)
-      setTickets([])
+    const fetchTicketsAndActivities = async () => {
+      setLoading(true)
+      setError(null)
+      setTickets([]) // Clear previous tickets
+      setActivities({}) // Clear previous activities
+
+      if (!jwtToken) {
+        setError('用戶未認證，無法獲取票務信息。');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/tickets/list_tickets`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${jwtToken}`,
+            'Content-Type': 'application/json',
+          }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const apiTickets: Ticket[] = Array.isArray(data) ? data : (Array.isArray(data.tickets) ? data.tickets : []);
+          setTickets(apiTickets);
+
+          if (apiTickets.length > 0) {
+            const uniqueActivityIds = Array.from(new Set(apiTickets.map(ticket => ticket.activity_id)));
+            
+            const activityPromises = uniqueActivityIds.map(id => fetchActivity(id));
+            const fetchedActivitiesResults = await Promise.allSettled(activityPromises);
+            const newActivities: Record<string, Activity> = {};
+            fetchedActivitiesResults.forEach((result, index) => {
+              if (result.status === 'fulfilled' && result.value) {
+                newActivities[uniqueActivityIds[index]] = result.value;
+              }
+            });
+            setActivities(newActivities);
+          } else {
+            // No tickets, so no activities to fetch
+          }
+        } else {
+          const errorText = await response.text()
+          if (errorText.includes('No tickets found')) {
+            setError(null); // No error, just no tickets
+          } else {
+            setError(errorText || '獲取票務失敗');
+          }
+        }
+      } catch (err: any) {
+        setError(err.message || '發生未知錯誤')
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [jwtToken, fetchTickets])
+
+    fetchTicketsAndActivities()
+  }, [jwtToken]) 
 
   const filteredTickets = tickets.filter((ticket) => {
-    if (filter === 'paid') return ticket.is_paid
-    if (filter === 'unpaid') return !ticket.is_paid
-    return true
-  })
+    if (!ticket || typeof ticket.status !== 'string') {
+        return false; 
+    }
+    const normalizedStatus = ticket.status.trim().toUpperCase();
+    if (filter === 'paid') return normalizedStatus === 'SOLD';
+    if (filter === 'unpaid') return normalizedStatus === 'UNPAID';
+    return true; 
+  });
 
   if (loading) {
     return <div>正在加載票務信息...</div>
@@ -128,10 +131,26 @@ const MyTicket: React.FC = () => {
     return <div>錯誤: {error}</div>
   }
 
+  const getTicketDisplayInfo = (status: string) => {
+    if (typeof status !== 'string') {
+        return { text: '未知狀態', allowPayment: false, color: 'black' }; 
+    }
+    const upperStatus = status.trim().toUpperCase();
+    switch (upperStatus) {
+      case 'UNPAID':
+        return { text: '未付款', allowPayment: true, color: 'red' };
+      case 'SOLD':
+        return { text: '已付款', allowPayment: false, color: 'green' };
+      case 'UNSOLD': // Should not typically be seen by a user for their own tickets
+        return { text: '未售出', allowPayment: false, color: 'grey' };
+      default:
+        return { text: upperStatus, allowPayment: false, color: 'black' };
+    }
+  };
+
   return (
     <div>
       <h2>我的訂單</h2>
-
       <div style={{ marginBottom: '20px' }}>
         <button
           onClick={() => setFilter('all')}
@@ -229,12 +248,17 @@ const MyTicket: React.FC = () => {
                   fontWeight: 'bold',
                 }}
               >
-                無
+                無符合條件的訂單
               </td>
             </tr>
           ) : (
             filteredTickets.map((ticket) => {
-              const activityData = activities[ticket.activity_id]
+              if (!ticket || !ticket.id) {
+                return null; 
+              }
+              const activityData = activities[ticket.activity_id];
+              const displayInfo = getTicketDisplayInfo(ticket.status);
+              
               return (
                 <tr key={ticket.id}>
                   <td
@@ -253,7 +277,7 @@ const MyTicket: React.FC = () => {
                       textAlign: 'center',
                     }}
                   >
-                    {activityData ? activityData.title : '載入中...'}
+                    {activityData ? activityData.title : (ticket.activity_id ? `活動 ID: ${ticket.activity_id} (資料載入中...)` : '活動資訊錯誤')}
                   </td>
                   <td
                     style={{
@@ -262,10 +286,10 @@ const MyTicket: React.FC = () => {
                       textAlign: 'center',
                     }}
                   >
-                    {ticket.seat_number}
+                    {String(ticket.seat_number)}
                   </td>
                   <td
-                    colSpan={ticket.is_paid ? 2 : 1}
+                    colSpan={displayInfo.allowPayment ? 1 : 2}
                     style={{
                       border: '1px solid #ccc',
                       padding: '8px',
@@ -274,14 +298,14 @@ const MyTicket: React.FC = () => {
                   >
                     <span
                       style={{
-                        color: ticket.is_paid ? 'green' : 'red',
+                        color: displayInfo.color,
                         fontWeight: 'bold',
                       }}
                     >
-                      {ticket.is_paid ? '已付款' : '未付款'}
+                      {displayInfo.text}
                     </span>
                   </td>
-                  {!ticket.is_paid && (
+                  {displayInfo.allowPayment && (
                     <td
                       style={{
                         border: '1px solid #ccc',
@@ -311,4 +335,4 @@ const MyTicket: React.FC = () => {
   )
 }
 
-export default MyTicket
+export default MyTicket;

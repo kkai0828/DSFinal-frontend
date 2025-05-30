@@ -1,71 +1,64 @@
 // src/components/UserSettings.tsx
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-const API_URL = process.env.REACT_APP_API_URL
 
 const UserSettings: React.FC = () => {
-  const { username, login } = useAuth() // 从 AuthContext 获取 name 和 login 方法
+  // Destructure all relevant fields from useAuth, including phone_number if available
+  const { username, email, phone_number, userId, role, login, jwtToken } = useAuth()
+  
   const [currentName, setCurrentName] = useState<string>(username || '')
-  const [phone, setPhone] = useState<string>(
-    localStorage.getItem('phone_number') || ''
-  )
-  const [email] = useState<string>(localStorage.getItem('email') || '')
+  // Initialize phone from AuthContext if available, otherwise fallback to localStorage, then empty string
+  const [phone, setPhone] = useState<string>(phone_number || '')
+  
 
   useEffect(() => {
     setCurrentName(username || '')
   }, [username])
 
+  // Effect to update phone state if authPhoneNumber changes
+  useEffect(() => {
+    setPhone(phone_number || '')
+  }, [phone_number])
+
   const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    const token = localStorage.getItem('jwt_token')
-    const role = localStorage.getItem('role') as 'client' | 'host'
-
-    if (!token || !role) {
+    if (!jwtToken || !role || !userId) { // Added userIdToUse check
       alert('未找到有效的登入資訊，請重新登入。')
       return
     }
 
     try {
-      const response = await fetch(`${API_URL}/auth`, {
+      const response = await fetch(`/auth/`, { // Using relative path - reverted from /auth/
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: token,
+          'Authorization': `Bearer ${jwtToken}`, 
         },
         body: JSON.stringify({
           username: currentName,
           phone_number: phone,
+          role: role,
         }),
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
+        const errorData = await response.json().catch(() => ({ message: '更新失敗，且無法解析錯誤資訊。' }))
         throw new Error(errorData.message || '更新失敗')
       }
 
-      const updatedUser = await response.json()
-
-      // 保存更新後的用戶資訊到本地存儲
-      localStorage.setItem('username', updatedUser.username)
-      localStorage.setItem('phone_number', updatedUser.phone_number)
-      // Note: The PUT /auth endpoint might not return the full user object with id.
-      // We should rely on the userId already in localStorage from the initial login.
-      const userId = localStorage.getItem('userId');
-      if (!userId) {
-        // This case should ideally not happen if user is logged in and userId was stored
-        alert('發生錯誤：無法找到使用者ID，請重新登入。');
-        // Optionally, redirect to login or handle more gracefully
-        return;
-      }
-
-      // 更新 AuthContext 的用戶資訊
-      // The order of arguments for login is: token, email, name, role, phone, userId
-      login(token, email, updatedUser.username, role as 'client' | 'host', updatedUser.phone_number, userId)
+      const updatedUser = await response.json() 
+      login(
+        jwtToken,   
+        email || '', // email is non-editable, use existing email from context/localStorage
+        currentName, 
+        role, 
+        phone,
+        userId // Use the existing userId
+      )
 
       alert('資訊更新成功')
     } catch (error: any) {
-      console.error('更新失敗:', error)
+      console.error('更新失敗:', error) // Keep console.error for debugging developer-side
       alert(`更新失敗: ${error.message}`)
     }
   }
@@ -83,15 +76,14 @@ const UserSettings: React.FC = () => {
     >
       <h2 style={{ textAlign: 'center', marginBottom: '20px' }}>使用者設定</h2>
       <form onSubmit={handleSaveChanges}>
-        {/* 电子邮箱 */}
         <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'block', marginBottom: '5px' }}>
             電子郵件
           </label>
           <input
             type="email"
-            value={email}
-            disabled // 邮箱不可编辑
+            value={email || ''} 
+            disabled 
             style={{
               width: '100%',
               padding: '10px',
@@ -103,7 +95,6 @@ const UserSettings: React.FC = () => {
           />
         </div>
 
-        {/* 姓名 */}
         <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'block', marginBottom: '5px' }}>姓名</label>
           <input
@@ -119,7 +110,6 @@ const UserSettings: React.FC = () => {
           />
         </div>
 
-        {/* 手机号码 */}
         <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'block', marginBottom: '5px' }}>
             手機號碼
@@ -128,6 +118,8 @@ const UserSettings: React.FC = () => {
             type="text"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
+            minLength={10}
+            maxLength={10}
             style={{
               width: '100%',
               padding: '10px',
